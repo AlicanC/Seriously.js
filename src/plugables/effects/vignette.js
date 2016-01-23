@@ -1,6 +1,6 @@
-'use strict';
+import Plugin from '../aaPlugin.js';
 
-module.exports = ['vignette', {
+module.exports = new Plugin('vignette', {
 	commonShader: true,
 	shader: function (inputs, shaderSource) {
 		shaderSource.fragment = [
@@ -35,4 +35,4 @@ module.exports = ['vignette', {
 	},
 	title: 'Vignette',
 	description: 'Vignette'
-}];
+});
