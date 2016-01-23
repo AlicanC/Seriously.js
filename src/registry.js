@@ -1,0 +1,27 @@
+module.exports = {
+  testContext: undefined,
+  colorCtx: undefined,
+  incompatibility: undefined,
+  seriousEffects: {},
+  seriousTransforms: {},
+  seriousSources: {},
+  seriousTargets: {},
+  allEffectsByHook: {},
+  allTransformsByHook: {},
+  allSourcesByHook: {
+    canvas: [],
+    image: [],
+    video: [],
+  },
+  allTargetsByHook: {},
+  allTargets: window.WeakMap && new WeakMap(),
+  identity: new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+  ]),
+  maxSeriouslyId: 0,
+  nop: function nop() {},
+  noVideoTextureSupport: undefined,
+};

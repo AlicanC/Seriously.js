@@ -1,4 +1,13 @@
-const TargetNode = module.exports = function TargetNode(hook, target, options) {
+const util = require('./util.js');
+const registry = require('./registry.js');
+const Node = require('./Node.js');
+const Target = require('./Target.js');
+const FrameBuffer = require('./FrameBuffer.js');
+const ShaderProgram = require('./ShaderProgram.js');
+
+let randomVars;
+const TargetNode = module.exports = function TargetNode(arandomVars, hook, target, options) {
+  randomVars = arandomVars;
   var opts,
     flip,
     width,
@@ -13,13 +22,13 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
     key;
 
   function targetPlugin(hook, target, options, force) {
-    var plugin = seriousTargets[hook];
+    var plugin = registry.seriousTargets[hook];
     if (plugin.definition) {
       plugin = plugin.definition.call(that, target, options, force);
       if (!plugin) {
         return null;
       }
-      plugin = Object.assign(Object.assign({}, seriousTargets[hook]), plugin);
+      plugin = Object.assign(Object.assign({}, registry.seriousTargets[hook]), plugin);
       that.hook = key;
       matchedType = true;
       that.plugin = plugin;
@@ -29,13 +38,13 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
       }
       if (plugin.gl && !that.gl) {
         that.gl = plugin.gl;
-        if (!gl) {
-          attachContext(plugin.gl);
+        if (!randomVars.gl) {
+          randomVars.funcs.attachContext(plugin.gl);
         }
       }
-      if (that.gl === gl) {
-        that.model = rectangleModel;
-        that.shader = baseShader;
+      if (that.gl === randomVars.gl) {
+        that.model = randomVars.rectangleModel;
+        that.shader = randomVars.baseShader;
       }
     }
     return plugin;
@@ -45,7 +54,7 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
     return that.target === target;
   }
 
-  Node.call(this);
+  Node.call(this, randomVars);
 
   if (hook && typeof hook !== 'string' || !target && target !== 0) {
     if (!options || typeof options !== 'object') {
@@ -61,22 +70,22 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
   debugContext = opts.debugContext;
 
   // forced target type?
-  if (typeof hook === 'string' && seriousTargets[hook]) {
+  if (typeof hook === 'string' && registry.seriousTargets[hook]) {
     targetPlugin(hook, target, opts, true);
   }
 
   this.renderToTexture = opts.renderToTexture;
 
-  if (isInstance(target, 'WebGLFramebuffer')) {
+  if (util.isInstance(target, 'WebGLFramebuffer')) {
     frameBuffer = target;
 
-    if (isInstance(opts, 'HTMLCanvasElement')) {
+    if (util.isInstance(opts, 'HTMLCanvasElement')) {
       target = opts;
-    } else if (isInstance(opts, 'WebGLRenderingContext')) {
+    } else if (util.isInstance(opts, 'WebGLRenderingContext')) {
       target = opts.canvas;
-    } else if (isInstance(opts.canvas, 'HTMLCanvasElement')) {
+    } else if (util.isInstance(opts.canvas, 'HTMLCanvasElement')) {
       target = opts.canvas;
-    } else if (isInstance(opts.context, 'WebGLRenderingContext')) {
+    } else if (util.isInstance(opts.context, 'WebGLRenderingContext')) {
       target = opts.context.canvas;
     } else {
       //todo: search all canvases for matching contexts?
@@ -84,14 +93,14 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
     }
   }
 
-  if (isInstance(target, 'HTMLCanvasElement')) {
+  if (util.isInstance(target, 'HTMLCanvasElement')) {
     width = target.width;
     height = target.height;
 
     //try to get a webgl context.
-    if (!gl || gl.canvas !== target && opts.allowSecondaryWebGL) {
+    if (!randomVars.gl || randomVars.gl.canvas !== target && opts.allowSecondaryWebGL) {
       triedWebGl = true;
-      context = getWebGlContext(target, {
+      context = util.getWebGlContext(target, {
         alpha: true,
         premultipliedAlpha: true,
         preserveDrawingBuffer: true,
@@ -101,20 +110,20 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
     }
 
     if (!context) {
-      if (!opts.allowSecondaryWebGL && gl && gl.canvas !== target) {
+      if (!opts.allowSecondaryWebGL && randomVars.gl && randomVars.gl.canvas !== target) {
         throw new Error('Only one WebGL target canvas allowed. Set allowSecondaryWebGL option to create secondary context.');
       }
 
-      this.render = nop;
-      Seriously.logger.log('Unable to create WebGL context.');
+      this.render = registry.nop;
+      util.logger.log('Unable to create WebGL context.');
       //throw new Error('Unable to create WebGL context.');
-    } else if (!gl || gl === context) {
+    } else if (!randomVars.gl || randomVars.gl === context) {
       //this is our main WebGL canvas
-      if (!primaryTarget) {
-        primaryTarget = this;
+      if (!randomVars.primaryTarget) {
+        randomVars.primaryTarget = this;
       }
-      if (!gl) {
-        attachContext(context);
+      if (!randomVars.gl) {
+        randomVars.funcs.attachContext(context);
       }
       this.render = this.renderWebGL;
 
@@ -122,8 +131,8 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
       Don't remember what this is for. Maybe we should remove it
       */
       if (opts.renderToTexture) {
-        if (gl) {
-          this.frameBuffer = new FrameBuffer(gl, width, height, false);
+        if (randomVars.gl) {
+          this.frameBuffer = new FrameBuffer(randomVars.gl, width, height, false);
         }
       } else {
         this.frameBuffer = {
@@ -140,16 +149,16 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
       this.frameBuffer = {
         frameBuffer: frameBuffer || null
       };
-      this.shader = new ShaderProgram(this.gl, baseVertexShader, baseFragmentShader);
-      this.model = buildRectangleModel.call(this, this.gl);
+      this.shader = new ShaderProgram(this.gl, randomVars.baseVertexShader, randomVars.baseFragmentShader);
+      this.model = randomVars.funcs.buildRectangleModel.call(this, this.gl);
       this.pixels = null;
 
       this.texture = this.gl.createTexture();
-      this.gl.bindTexture(gl.TEXTURE_2D, this.texture);
-      this.gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      this.gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      this.gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      this.gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      this.gl.bindTexture(randomVars.gl.TEXTURE_2D, this.texture);
+      this.gl.texParameteri(randomVars.gl.TEXTURE_2D, randomVars.gl.TEXTURE_MAG_FILTER, randomVars.gl.LINEAR);
+      this.gl.texParameteri(randomVars.gl.TEXTURE_2D, randomVars.gl.TEXTURE_MIN_FILTER, randomVars.gl.LINEAR);
+      this.gl.texParameteri(randomVars.gl.TEXTURE_2D, randomVars.gl.TEXTURE_WRAP_S, randomVars.gl.CLAMP_TO_EDGE);
+      this.gl.texParameteri(randomVars.gl.TEXTURE_2D, randomVars.gl.TEXTURE_WRAP_T, randomVars.gl.CLAMP_TO_EDGE);
 
       this.render = this.renderSecondaryWebGL;
     }
@@ -158,8 +167,8 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
   }
 
   if (!matchedType) {
-    for (key in seriousTargets) {
-      if (seriousTargets.hasOwnProperty(key) && seriousTargets[key]) {
+    for (key in registry.seriousTargets) {
+      if (registry.seriousTargets.hasOwnProperty(key) && registry.seriousTargets[key]) {
         if (targetPlugin(key, target, opts, false)) {
           break;
         }
@@ -171,10 +180,10 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
     throw new Error('Unknown target type');
   }
 
-  if (allTargets) {
-    targetList = allTargets.get(target);
+  if (registry.allTargets) {
+    targetList = registry.allTargets.get(target);
     if (targetList) {
-      Seriously.logger.warn(
+      util.logger.warn(
         'Target already in use by another instance',
         target,
         Object.keys(targetList).map(function (key) {
@@ -183,9 +192,9 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
       );
     } else {
       targetList = {};
-      allTargets.set(target, targetList);
+      registry.allTargets.set(target, targetList);
     }
-    targetList[seriously.id] = seriously;
+    targetList[randomVars.seriously.id] = randomVars.seriously;
   }
 
   this.target = target;
@@ -205,15 +214,15 @@ const TargetNode = module.exports = function TargetNode(hook, target, options) {
   if (opts.auto !== undefined) {
     this.auto = opts.auto;
   } else {
-    this.auto = auto;
+    this.auto = randomVars.auto;
   }
   this.frames = 0;
 
   this.pub = new Target(this);
 
-  nodes.push(this);
-  nodesById[this.id] = this;
-  targets.push(this);
+  randomVars.nodes.push(this);
+  randomVars.nodesById[this.id] = this;
+  randomVars.targets.push(this);
 };
 
 TargetNode.prototype = Object.create(Node.prototype);
@@ -224,7 +233,7 @@ TargetNode.prototype.setSource = function (source) {
 
   //todo: what if source is null/undefined/false
 
-  newSource = findInputNode(source);
+  newSource = randomVars.funcs.findInputNode(source);
 
   //todo: check for cycles
 
@@ -251,14 +260,14 @@ TargetNode.prototype.setSource = function (source) {
 TargetNode.prototype.setDirty = function () {
   this.dirty = true;
 
-  if (this.auto && !rafId) {
-    rafId = requestAnimationFrame(renderDaemon);
+  if (this.auto && !randomVars.rafId) {
+    randomVars.rafId = requestAnimationFrame(randomVars.funcs.renderDaemon);
   }
 };
 
 TargetNode.prototype.resize = function () {
   //if target is a canvas, reset size to canvas size
-  if (isInstance(this.target, 'HTMLCanvasElement')) {
+  if (util.isInstance(this.target, 'HTMLCanvasElement')) {
     if (this.width !== this.target.width || this.height !== this.target.height) {
       this.target.width = this.width;
       this.target.height = this.height;
@@ -294,8 +303,8 @@ TargetNode.prototype.stop = function () {
 };
 
 TargetNode.prototype.render = function () {
-  if (gl && this.plugin && this.plugin.render) {
-    this.plugin.render.call(this, draw, baseShader, rectangleModel);
+  if (randomVars.gl && this.plugin && this.plugin.render) {
+    this.plugin.render.call(this, randomVars.funcs.draw, randomVars.baseShader, randomVars.rectangleModel);
   }
 };
 
@@ -304,7 +313,7 @@ TargetNode.prototype.renderWebGL = function () {
 
   this.resize();
 
-  if (gl && this.dirty && this.ready) {
+  if (randomVars.gl && this.dirty && this.ready) {
     if (!this.source) {
       return;
     }
@@ -314,10 +323,10 @@ TargetNode.prototype.renderWebGL = function () {
     this.uniforms.source = this.source.texture;
 
     if (this.source.width === this.width && this.source.height === this.height) {
-      this.uniforms.transform = this.source.cumulativeMatrix || identity;
+      this.uniforms.transform = this.source.cumulativeMatrix || registry.identity;
     } else if (this.transformDirty) {
       matrix = this.transform;
-      mat4.copy(matrix, this.source.cumulativeMatrix || identity);
+      util.mat4.copy(matrix, this.source.cumulativeMatrix || registry.identity);
       x = this.source.width / this.width;
       y = this.source.height / this.height;
       matrix[0] *= x;
@@ -332,7 +341,7 @@ TargetNode.prototype.renderWebGL = function () {
       this.transformDirty = false;
     }
 
-    draw(baseShader, rectangleModel, this.uniforms, this.frameBuffer.frameBuffer, this, outputRenderOptions);
+    randomVars.funcs.draw(randomVars.baseShader, randomVars.rectangleModel, this.uniforms, this.frameBuffer.frameBuffer, this, randomVars.outputRenderOptions);
 
     this.emit('render');
     this.dirty = false;
@@ -362,10 +371,10 @@ TargetNode.prototype.renderSecondaryWebGL = function () {
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, sourceWidth, sourceHeight, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.pixels);
 
     if (sourceWidth === this.width && sourceHeight === this.height) {
-      this.uniforms.transform = identity;
+      this.uniforms.transform = registry.identity;
     } else if (this.transformDirty) {
       matrix = this.transform;
-      mat4.copy(matrix, identity);
+      util.mat4.copy(matrix, registry.identity);
       x = this.source.width / this.width;
       y = this.source.height / this.height;
       matrix[0] *= x;
@@ -381,7 +390,7 @@ TargetNode.prototype.renderSecondaryWebGL = function () {
     }
 
     this.uniforms.source = this.texture;
-    draw(this.shader, this.model, this.uniforms, null, this, outputRenderOptions);
+    randomVars.funcs.draw(this.shader, this.model, this.uniforms, null, this, randomVars.outputRenderOptions);
 
     this.dirty = false;
   }
@@ -402,11 +411,11 @@ TargetNode.prototype.destroy = function () {
     this.source.removeTarget(this);
   }
 
-  if (allTargets) {
-    targetList = allTargets.get(this.target);
-    delete targetList[seriously.id];
+  if (registry.allTargets) {
+    targetList = registry.allTargets.get(this.target);
+    delete targetList[randomVars.seriously.id];
     if (!Object.keys(targetList).length) {
-      allTargets.delete(this.target);
+      registry.allTargets.delete(this.target);
     }
   }
 
@@ -422,17 +431,17 @@ TargetNode.prototype.destroy = function () {
   delete this.auto;
 
   //remove self from master list of targets
-  i = targets.indexOf(this);
+  randomVarsstry.targets.indexOf(this);
   if (i >= 0) {
-    targets.splice(i, 1);
+    randomVars.targets.splice(i, 1);
   }
 
   Node.prototype.destroy.call(this);
 
   //clear out context so we can start over
-  if (this === primaryTarget) {
-    glCanvas.removeEventListener('webglcontextrestored', restoreContext, false);
-    destroyContext();
-    primaryTarget = null;
+  if (this === randomVars.primaryTarget) {
+    randomVars.glCanvas.removeEventListener('webglcontextrestored', randomVars.funcs.restoreContext, false);
+    randomVars.funcs.destroyContext();
+    randomVars.primaryTarget = null;
   }
 };

@@ -1,3 +1,5 @@
+const util = require('./util.js');
+
 const Transform = module.exports = function Transform(transformNode) {
   var me = transformNode,
     self = this,
@@ -21,7 +23,7 @@ const Transform = module.exports = function Transform(transformNode) {
       }
     }
 
-    if (isInstance(input, 'HTMLInputElement') || isInstance(input, 'HTMLSelectElement')) {
+    if (util.isInstance(input, 'HTMLInputElement') || util.isInstance(input, 'HTMLSelectElement')) {
       value = input.value;
 
       if (lookup && lookup.element !== input) {

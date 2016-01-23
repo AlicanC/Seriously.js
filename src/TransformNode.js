@@ -1,6 +1,11 @@
+const registry = require('./registry.js');
 const util = require('./util.js');
+const Node = require('./Node.js');
+const Transform = require('./Transform.js');
 
-const TransformNode = module.exports = function TransformNode(seriously, hook, options) {
+let randomVars;
+const TransformNode = module.exports = function TransformNode(arandomVars, hook, options) {
+  randomVars = arandomVars;
   var key,
     input,
     initialValue,
@@ -14,9 +19,9 @@ const TransformNode = module.exports = function TransformNode(seriously, hook, o
   this.width = 1;
   this.height = 1;
 
-  this.seriously = seriously;
+  this.seriously = randomVars.seriously;
 
-  this.transformRef = seriousTransforms[hook];
+  this.transformRef = registry.seriousTransforms[hook];
   this.hook = hook;
   this.id = util.nodeId;
   util.nodeId++;
@@ -56,22 +61,22 @@ const TransformNode = module.exports = function TransformNode(seriously, hook, o
       }
     }
   }
-  validateInputSpecs(this.plugin);
+  util.validateInputSpecs(this.plugin);
 
   // set default value for all inputs (no defaults for methods)
-  defaults = defaultInputs[hook];
+  defaults = randomVars.defaultInputs[hook];
   for (key in this.plugin.inputs) {
     if (this.plugin.inputs.hasOwnProperty(key)) {
       input = this.plugin.inputs[key];
 
       if (typeof input.set === 'function' && typeof input.get === 'function' &&
           typeof input.method !== 'function') {
-
         initialValue = input.get.call(this);
         defaultValue = input.defaultValue === undefined ? initialValue : input.defaultValue;
         defaultValue = input.validate.call(this, defaultValue, input, initialValue);
         if (defaults && defaults[key] !== undefined) {
-          defaultValue = input.validate.call(this, defaults[key], input, input.defaultValue, defaultValue);
+          defaultValue = input.validate
+          .call(this, defaults[key], input, input.defaultValue, defaultValue);
           defaults[key] = defaultValue;
         }
         if (defaultValue !== initialValue) {
@@ -81,14 +86,14 @@ const TransformNode = module.exports = function TransformNode(seriously, hook, o
     }
   }
 
-  nodes.push(this);
-  nodesById[this.id] = this;
+  randomVars.nodes.push(this);
+  randomVars.nodesById[this.id] = this;
 
   this.pub = new Transform(this);
 
-  transforms.push(this);
+  randomVars.transforms.push(this);
 
-  allTransformsByHook[hook].push(this);
+  registry.allTransformsByHook[hook].push(this);
 };
 
 TransformNode.prototype = Object.create(Node.prototype);
@@ -190,8 +195,8 @@ TransformNode.prototype.setInput = function (name, value) {
   if (this.plugin.inputs.hasOwnProperty(name)) {
     input = this.plugin.inputs[name];
 
-    if (defaultInputs[this.hook] && defaultInputs[this.hook][name] !== undefined) {
-      defaultValue = defaultInputs[this.hook][name];
+    if (randomVars.defaultInputs[this.hook] && randomVars.defaultInputs[this.hook][name] !== undefined) {
+      defaultValue = randomVars.defaultInputs[this.hook][name];
     } else {
       defaultValue = input.defaultValue;
     }
@@ -334,7 +339,7 @@ TransformNode.prototype.readPixels = function (x, y, width, height, dest) {
 
   if (dest === undefined) {
     dest = new Uint8Array(width * height * 4);
-  } else if (!(isInstance(dest, 'Uint8Array'))) {
+  } else if (!(util.isInstance(dest, 'Uint8Array'))) {
     throw new Error('Incompatible array type');
   }
 

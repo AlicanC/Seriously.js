@@ -1,4 +1,10 @@
-const SourceNode = module.exports = function SourceNode(hook, source, options) {
+const util = require('./util.js');
+const Node = require('./Node.js');
+const Source = require('./Source.js');
+
+let randomVars;
+const SourceNode = module.exports = function SourceNode(arandomVars, hook, source, options) {
+  randomVars = arandomVars;
   var opts = options || {},
     flip = opts.flip === undefined ? true : opts.flip,
     width = opts.width,
@@ -26,7 +32,7 @@ const SourceNode = module.exports = function SourceNode(hook, source, options) {
     return that.source === source;
   }
 
-  Node.call(this);
+  Node.call(this, randomVars);
 
   if (hook && typeof hook !== 'string' || !source && source !== 0) {
     if (!options || typeof options !== 'object') {
@@ -56,7 +62,7 @@ const SourceNode = module.exports = function SourceNode(hook, source, options) {
   }
 
   //todo: could probably stand to re-work and re-indent this whole block now that we have plugins
-  if (!plugin && isInstance(source)) {
+  if (!plugin && util.isInstance(source)) {
     if (source.tagName === 'CANVAS') {
       this.width = source.width;
       this.height = source.height;
@@ -91,7 +97,7 @@ const SourceNode = module.exports = function SourceNode(hook, source, options) {
       this.hook = 'image';
       this.compare = compareSource;
     }
-  } else if (!plugin && isInstance(source, 'WebGLTexture')) {
+  } else if (!plugin && util.isInstance(source, 'WebGLTexture')) {
     if (gl && !gl.isTexture(source)) {
       throw new Error('Not a valid WebGL texture.');
     }

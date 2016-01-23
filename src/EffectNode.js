@@ -1,6 +1,7 @@
-const Effect = require('./Effect');
+const Node = require('./Node.js');
+const Effect = require('./Effect.js');
 
-const EffectNode = module.exports = function EffectNode(nodes, nodesById, effects, allEffectsByHook, defaultInputs, identity, validateInputSpecs, gl, seriousEffects, hook, options) {
+const EffectNode = module.exports = function EffectNode(randomVars, hook, options) {
   let key;
   let name;
   let input;
@@ -8,7 +9,7 @@ const EffectNode = module.exports = function EffectNode(nodes, nodesById, effect
   let defaults;
   const defaultSources = {};
 
-  Node.call(this, options);
+  Node.call(this, randomVars, options);
   this.gl = gl;
 
   this.effectRef = seriousEffects[hook];

@@ -1,11 +1,13 @@
 const util = require('./util.js');
 
-const Node = module.exports = function Node() {
+let randomVars;
+const Node = module.exports = function Node(arandomVars) {
+  randomVars = arandomVars;
   this.ready = false;
   this.width = 1;
   this.height = 1;
 
-  this.gl = gl;
+  this.gl = randomVars.gl;
 
   this.uniforms = {
     resolution: [this.width, this.height],
@@ -15,7 +17,7 @@ const Node = module.exports = function Node() {
   this.dirty = true;
   this.isDestroyed = false;
 
-  this.seriously = seriously;
+  this.seriously = randomVars.seriously;
 
   this.listeners = {};
 
@@ -73,9 +75,9 @@ Node.prototype.initFrameBuffer = function (useFloat) {
 };
 
 Node.prototype.readPixels = function (x, y, width, height, dest) {
-  var nodeGl = this.gl || gl;
+  var nodeGl = this.gl || randomVars.gl;
 
-  if (!gl) {
+  if (!randomVars.gl) {
     //todo: is this the best approach?
     throw new Error('Cannot read pixels until a canvas is connected');
   }
@@ -93,7 +95,7 @@ Node.prototype.readPixels = function (x, y, width, height, dest) {
   //todo: figure out formats and types
   if (dest === undefined) {
     dest = new Uint8Array(width * height * 4);
-  } else if (!(isInstance(dest, 'Uint8Array'))) {
+  } else if (!(util.isInstance(dest, 'Uint8Array'))) {
     throw new Error('Incompatible array type');
   }
 
@@ -188,7 +190,7 @@ Node.prototype.emit = function (eventName) {
 
   if (listeners && listeners.length) {
     for (i = 0; i < listeners.length; i++) {
-      setTimeoutZero(listeners[i]);
+      util.setTimeoutZero(listeners[i]);
     }
   }
 };
@@ -226,11 +228,11 @@ Node.prototype.destroy = function () {
   }
 
   //remove from main nodes index
-  i = nodes.indexOf(this);
+  i = randomVars.nodes.indexOf(this);
   if (i >= 0) {
-    nodes.splice(i, 1);
+    randomVars.nodes.splice(i, 1);
   }
-  delete nodesById[this.id];
+  delete randomVars.nodesById[this.id];
 
   this.isDestroyed = true;
 };

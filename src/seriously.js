@@ -1,8 +1,8 @@
 const util = require('./util.js');
 const isInstance = util.isInstance;
 const cancelAnimFrame = util.cancelAnimFrame;
-
 const validateInputSpecs = util.validateInputSpecs;
+const registry = require('./registry.js');
 
 /*global Float32Array, Uint8Array, Uint16Array, WebGLTexture, HTMLInputElement, HTMLSelectElement, HTMLElement, WebGLFramebuffer, HTMLCanvasElement, WebGLRenderingContext, define, module, exports */
 
@@ -12,27 +12,6 @@ const console = window.console;
 /*
   Global-ish look-up variables
 */
-
-let testContext;
-let colorCtx;
-let incompatibility;
-const seriousEffects = {};
-const seriousTransforms = {};
-const seriousSources = {};
-const seriousTargets = {};
-const allEffectsByHook = {};
-const allTransformsByHook = {};
-const allSourcesByHook = {
-  canvas: [],
-  image: [],
-  video: [],
-};
-const allTargetsByHook = {};
-let allTargets = window.WeakMap && new WeakMap();
-let identity;
-let maxSeriouslyId = 0;
-const nop = function nop() {};
-let noVideoTextureSupport;
 
 /*
   Global reference variables
@@ -164,7 +143,7 @@ function Seriously(options) {
   }
 
   //initialize object, private properties
-  var id = ++maxSeriouslyId,
+  var id = ++registry.maxSeriouslyId,
     seriously = this,
     nodes = [],
     nodesById = {},
@@ -625,6 +604,7 @@ function Seriously(options) {
   }
 
   function findInputNode(hook, source, options) {
+    console.log('fin', hook, source, options);
     var node, i;
 
     if (typeof hook !== 'string' || !source && source !== 0) {
@@ -632,9 +612,10 @@ function Seriously(options) {
         options = source;
       }
       source = hook;
+      console.log('got source');
     }
 
-    if (typeof hook !== 'string' || !seriousSources[hook]) {
+    if (typeof hook !== 'string' || !registry.seriousSources[hook]) {
       hook = null;
     }
 
@@ -662,7 +643,7 @@ function Seriously(options) {
         }
       }
 
-      node = new SourceNode(hook, source, options);
+      node = new SourceNode(randomVars, hook, source, options);
     }
 
     return node;
@@ -738,15 +719,71 @@ function Seriously(options) {
   if (options.canvas) {
   }
 
+  const randomVars = {
+    funcs: {
+      makeGlModel,
+      buildRectangleModel,
+      attachContext,
+      restoreContext,
+      destroyContext,
+      renderDaemon,
+      draw,
+      findInputNode,
+      traceSources,
+    },
+
+    colorRegex,
+    hexColorRegex,
+    vectorFields,
+    colorFields,
+    outputRenderOptions,
+    shaderDebugConstants,
+    shaderNameRegex,
+
+    baseVertexShader,
+    baseFragmentShader,
+
+    seriously,
+    nodes,
+    nodesById,
+    nodeId,
+    sources,
+    targets,
+    transforms,
+    effects,
+    aliases,
+    preCallbacks,
+    postCallbacks,
+    defaultInputs,
+    glCanvas,
+    gl,
+    primaryTarget,
+    rectangleModel,
+    commonShaders,
+    baseShader,
+    Node,
+    SourceNode,
+    EffectNode,
+    TransformNode,
+    TargetNode,
+    Effect,
+    Source,
+    Transform,
+    Target,
+    auto,
+    isDestroyed,
+    rafId,
+  };
+
   /*
   priveleged methods
   */
   this.effect = function (hook, options) {
-    if (!seriousEffects[hook]) {
+    if (!registry.seriousEffects[hook]) {
       throw new Error('Unknown effect: ' + hook);
     }
 
-    var effectNode = new EffectNode(nodes, nodesById, effects, allEffectsByHook, defaultInputs, identity, validateInputSpecs, gl, seriousEffects, hook, options);
+    var effectNode = new EffectNode(randomVars, hook, options);
     return effectNode.pub;
   };
 
@@ -764,17 +801,17 @@ function Seriously(options) {
     }
 
     if (hook) {
-      if (!seriousTransforms[hook]) {
+      if (!registry.seriousTransforms[hook]) {
         throw new Error('Unknown transform: ' + hook);
       }
     } else {
       hook = options && options.defaultTransform || '2d';
-      if (!seriousTransforms[hook]) {
+      if (!registry.seriousTransforms[hook]) {
         throw new Error('No transform specified');
       }
     }
 
-    transformNode = new TransformNode(this, hook, opts);
+    transformNode = new TransformNode(randomVars, hook, opts);
     return transformNode.pub;
   };
 
@@ -808,7 +845,7 @@ function Seriously(options) {
       }
     }
 
-    targetNode = new TargetNode(hook, target, options);
+    targetNode = new TargetNode(randomVars, hook, target, options);
 
     return targetNode.pub;
   };
@@ -944,9 +981,9 @@ function Seriously(options) {
     }
 
     if (!hook) {
-      for (key in allEffectsByHook) {
-        if (allEffectsByHook.hasOwnProperty(key) && allEffectsByHook[key].length) {
-          plugin = seriousEffects[key];
+      for (key in registry.allEffectsByHook) {
+        if (registry.allEffectsByHook.hasOwnProperty(key) && registry.allEffectsByHook[key].length) {
+          plugin = registry.seriousEffects[key];
           if (plugin && typeof plugin.compatible === 'function' &&
               !plugin.compatible.call(this)) {
             return 'plugin-' + key;
@@ -954,9 +991,9 @@ function Seriously(options) {
         }
       }
 
-      for (key in allSourcesByHook) {
-        if (allSourcesByHook.hasOwnProperty(key) && allSourcesByHook[key].length) {
-          plugin = seriousSources[key];
+      for (key in registry.allSourcesByHook) {
+        if (registry.allSourcesByHook.hasOwnProperty(key) && registry.allSourcesByHook[key].length) {
+          plugin = registry.seriousSources[key];
           if (plugin && typeof plugin.compatible === 'function' &&
               !plugin.compatible.call(this)) {
             return 'source-' + key;
@@ -1036,14 +1073,14 @@ Seriously.incompatible = function (hook) {
   }
 
   if (hook) {
-    plugin = seriousEffects[hook];
+    plugin = registry.seriousEffects[hook];
     if (plugin && typeof plugin.compatible === 'function' &&
       !plugin.compatible(gl)) {
 
       return 'plugin-' + hook;
     }
 
-    plugin = seriousSources[hook];
+    plugin = registry.seriousSources[hook];
     if (plugin && typeof plugin.compatible === 'function' &&
       !plugin.compatible(gl)) {
 
@@ -1057,7 +1094,7 @@ Seriously.incompatible = function (hook) {
 Seriously.plugin = function (hook, definition, meta) {
   var effect;
 
-  if (seriousEffects[hook]) {
+  if (registry.seriousEffects[hook]) {
     Seriously.logger.warn('Effect [' + hook + '] already loaded');
     return;
   }
@@ -1092,8 +1129,8 @@ Seriously.plugin = function (hook, definition, meta) {
   }
   */
 
-  seriousEffects[hook] = effect;
-  allEffectsByHook[hook] = [];
+  registry.seriousEffects[hook] = effect;
+  registry.allEffectsByHook[hook] = [];
 
   return effect;
 };
@@ -1105,22 +1142,22 @@ Seriously.removePlugin = function (hook) {
     return this;
   }
 
-  plugin = seriousEffects[hook];
+  plugin = registry.seriousEffects[hook];
 
   if (!plugin) {
     return this;
   }
 
-  all = allEffectsByHook[hook];
+  all = registry.allEffectsByHook[hook];
   if (all) {
     while (all.length) {
       effect = all.shift();
       effect.destroy();
     }
-    delete allEffectsByHook[hook];
+    delete registry.allEffectsByHook[hook];
   }
 
-  delete seriousEffects[hook];
+  delete registry.seriousEffects[hook];
 
   return this;
 };
@@ -1128,7 +1165,7 @@ Seriously.removePlugin = function (hook) {
 Seriously.source = function (hook, definition, meta) {
   var source;
 
-  if (seriousSources[hook]) {
+  if (registry.seriousSources[hook]) {
     Seriously.logger.warn('Source [' + hook + '] already loaded');
     return;
   }
@@ -1152,8 +1189,8 @@ Seriously.source = function (hook, definition, meta) {
   }
 
 
-  seriousSources[hook] = source;
-  allSourcesByHook[hook] = [];
+  registry.seriousSources[hook] = source;
+  registry.allSourcesByHook[hook] = [];
 
   return source;
 };
@@ -1165,22 +1202,22 @@ Seriously.removeSource = function (hook) {
     return this;
   }
 
-  plugin = seriousSources[hook];
+  plugin = registry.seriousSources[hook];
 
   if (!plugin) {
     return this;
   }
 
-  all = allSourcesByHook[hook];
+  all = registry.allSourcesByHook[hook];
   if (all) {
     while (all.length) {
       source = all.shift();
       source.destroy();
     }
-    delete allSourcesByHook[hook];
+    delete registry.allSourcesByHook[hook];
   }
 
-  delete seriousSources[hook];
+  delete registry.seriousSources[hook];
 
   return this;
 };
@@ -1188,7 +1225,7 @@ Seriously.removeSource = function (hook) {
 Seriously.transform = function (hook, definition, meta) {
   var transform;
 
-  if (seriousTransforms[hook]) {
+  if (registry.seriousTransforms[hook]) {
     Seriously.logger.warn('Transform [' + hook + '] already loaded');
     return;
   }
@@ -1218,8 +1255,8 @@ Seriously.transform = function (hook, definition, meta) {
     transform.title = hook;
   }
 
-  seriousTransforms[hook] = transform;
-  allTransformsByHook[hook] = [];
+  registry.seriousTransforms[hook] = transform;
+  registry.allTransformsByHook[hook] = [];
 
   return transform;
 };
@@ -1231,22 +1268,22 @@ Seriously.removeTransform = function (hook) {
     return this;
   }
 
-  plugin = seriousTransforms[hook];
+  plugin = registry.seriousTransforms[hook];
 
   if (!plugin) {
     return this;
   }
 
-  all = allTransformsByHook[hook];
+  all = registry.allTransformsByHook[hook];
   if (all) {
     while (all.length) {
       transform = all.shift();
       transform.destroy();
     }
-    delete allTransformsByHook[hook];
+    delete registry.allTransformsByHook[hook];
   }
 
-  delete seriousTransforms[hook];
+  delete registry.seriousTransforms[hook];
 
   return this;
 };
@@ -1322,9 +1359,9 @@ Seriously.prototype.effects = Seriously.effects = function () {
     input,
     i;
 
-  for (name in seriousEffects) {
-    if (seriousEffects.hasOwnProperty(name)) {
-      effect = seriousEffects[name];
+  for (name in registry.seriousEffects) {
+    if (registry.seriousEffects.hasOwnProperty(name)) {
+      effect = registry.seriousEffects[name];
       manifest = {
         title: effect.title || name,
         description: effect.description || '',
@@ -1357,15 +1394,6 @@ Seriously.prototype.effects = Seriously.effects = function () {
 
   return effects;
 };
-
-if (window.Float32Array) {
-  identity = new Float32Array([
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-  ]);
-}
 
 //check for plugins loaded out of order
 if (window.Seriously) {
