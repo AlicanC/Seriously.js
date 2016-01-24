@@ -32,17 +32,17 @@ import {
 let maxSeriouslyId = 0;
 export default class Seriously {
   static registry = {
-    sources: {},
     effects: {},
     transforms: {},
+    sources: {},
     targets: {},
     allEffectsByHook: {},
+    allTransformsByHook: {},
     allSourcesByHook: {
       canvas: [],
       image: [],
       video: [],
     },
-    allTransformsByHook: {},
     allTargetsByHook: {},
     allTargets: new WeakMap(),
   };

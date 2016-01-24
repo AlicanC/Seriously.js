@@ -17,7 +17,7 @@ export default class SourceNode extends PluggableNode {
       if (p.definition) {
         p = p.definition.call(this, source, options, force);
         if (p) {
-          p = Object.assign(Object.assign({}, this.seriously.Seriously.registry.sources[hook]), p); // eslint-disable-line max-len
+          p = Object.assign({}, this.seriously.Seriously.registry.sources[hook], p); // eslint-disable-line max-len
         } else {
           return null;
         }

@@ -381,6 +381,16 @@ export function setTimeoutZero(fn) {
   window.postMessage('seriously-timeout-message', window.location);
 }
 
+window.addEventListener('message', (event) => {
+  if (event.source === window && event.data === 'seriously-timeout-message') {
+    event.stopPropagation();
+    if (timeouts.length > 0) {
+      const fn = timeouts.shift();
+      fn();
+    }
+  }
+}, true);
+
 export const identity = new Float32Array([
   1, 0, 0, 0,
   0, 1, 0, 0,
