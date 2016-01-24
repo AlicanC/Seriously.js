@@ -243,8 +243,8 @@ export default class EffectNode extends PluggableNode {
         } else if (shader && shader.vertex && shader.fragment) {
           this.shader = new ShaderProgram(
             this.seriously.gl,
-            addShaderName(this.node, shader.vertex),
-            addShaderName(this.node, shader.fragment)
+            addShaderName(this, shader.vertex),
+            addShaderName(this, shader.fragment)
           );
         } else {
           this.shader = this.seriously.baseShader;
@@ -349,15 +349,15 @@ export default class EffectNode extends PluggableNode {
     if (this.effect.inputs.hasOwnProperty(name)) {
       input = this.effect.inputs[name];
       if (input.type === 'image') {
-        //&& !(value instanceof Effect) && !(value instanceof Source)) {
+        // && !(value instanceof Effect) && !(value instanceof Source)) {
 
         if (value) {
-          value = findInputNode(value);
+          value = this.seriously.findInputNode(value); // eslint-disable-line no-param-reassign
 
           if (value !== this.sources[name]) {
             disconnectSource();
 
-            if (traceSources(value, this)) {
+            if (this.seriously.traceSources(value, this)) {
               throw new Error('Attempt to make cyclical connection.');
             }
 
@@ -366,7 +366,7 @@ export default class EffectNode extends PluggableNode {
           }
         } else {
           delete this.sources[name];
-          value = false;
+          value = false; // eslint-disable-line no-param-reassign, max-len
         }
 
         uniform = this.sources[name];
@@ -379,12 +379,13 @@ export default class EffectNode extends PluggableNode {
           this.uniforms.transform = identity;
         }
       } else {
-        if (defaultInputs[this.hook] && defaultInputs[this.hook][name] !== undefined) {
-          defaultValue = defaultInputs[this.hook][name];
+        if (this.seriously.defaultInputs[this.hook]
+          && this.seriously.defaultInputs[this.hook][name] !== undefined) {
+          defaultValue = this.seriously.defaultInputs[this.hook][name];
         } else {
           defaultValue = input.defaultValue;
         }
-        value = input.validate.call(this, value, input, defaultValue, this.inputs[name]);
+        value = input.validate.call(this, value, input, defaultValue, this.inputs[name]); // eslint-disable-line no-param-reassign, max-len
         uniform = value;
       }
 

@@ -1,3 +1,5 @@
+import inputValidators from './inputValidators.js';
+
 export function makeGlModel(shape, gl) {
   if (!gl) {
     return false;
@@ -209,12 +211,11 @@ export const reservedNames = [
   'transform',
 ];
 
-function isArrayLike(obj) {
+export function isArrayLike(obj) {
   return Array.isArray(obj) ||
     (obj && obj.BYTES_PER_ELEMENT && 'length' in obj);
 }
 
-const inputValidators = require('./inputValidators.js');
 export function validateInputSpecs(plugin) {
   let input;
   let options;

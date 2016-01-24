@@ -37,8 +37,13 @@ export default class Seriously {
     transforms: {},
     targets: {},
     allEffectsByHook: {},
-    allSourcesByHook: {},
+    allSourcesByHook: {
+      canvas: [],
+      image: [],
+      video: [],
+    },
     allTransformsByHook: {},
+    allTargetsByHook: {},
     allTargets: new WeakMap(),
   };
 
@@ -1214,11 +1219,11 @@ todo: additional transform node types
 module.exports = Seriously;
 
 // UGLY!
-const effects = ['polar', 'tvglitch', 'temperature', 'ripple',
+const effects = ['polar', 'temperature', 'ripple',
   'brightness-contrast', 'channels', 'hue-saturation', 'noise',
   'sepia', 'vibrance', 'vignette', 'filmgrain', 'exposure'];
 
-const blur = require('./effects/blur/blur.js');
+const blur = require('./plugables/effects/blur/blur.js');
 if (blur.definition) {
   Seriously.plugin(blur.hook, blur.definition, blur.meta);
 } else {
@@ -1227,7 +1232,7 @@ if (blur.definition) {
 
 
 for (const effectName of effects) {
-  const effect = require(`./effects/${effectName}.js`);
+  const effect = require(`./plugables/effects/${effectName}.js`);
   if (effect.definition) {
     Seriously.plugin(effect.hook, effect.definition, effect.meta);
   } else {

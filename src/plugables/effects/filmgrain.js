@@ -1,4 +1,4 @@
-import Plugin from '../Plugin.js';
+import Plugin from '../aaPlugin.js';
 
 module.exports = new Plugin('filmgrain', {
   commonShader: true,

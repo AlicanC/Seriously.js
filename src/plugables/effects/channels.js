@@ -1,5 +1,5 @@
 import Plugin from '../aaPlugin.js';
-const utillll = require('../util.js');
+import ShaderProgram from '../../ShaderProgram.js';
 
 var channelOptions = [
 		'Red',
@@ -255,7 +255,7 @@ module.exports = new Plugin('channels', function () {
 				'}'
 			].join('\n');
 
-			shader = new utillll.ShaderProgram(this.gl,
+			shader = new ShaderProgram(this.gl,
 				vert,
 				frag);
 

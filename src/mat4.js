@@ -4,7 +4,7 @@ https://github.com/toji/gl-matrix
 License: https://github.com/toji/gl-matrix/blob/master/LICENSE.md
 */
 
-module.exports = {
+const mat4 = module.exports = {
   /*
    * mat4.frustum
    * Generates a frustum matrix with the given bounds

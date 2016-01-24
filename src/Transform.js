@@ -2,9 +2,7 @@ import Pluggable from './Pluggable.js';
 import { getElement, isInstance, colorArrayToHex } from './utilities.js';
 
 function setInput(node, inputName, def, input) {
-  var inputKey, lookup, value; // eslint-disable-line
-
-  lookup = node.inputElements[inputName];
+  let lookup = node.inputElements[inputName];
 
   // TODO: there is some duplicate code with Effect here. Consolidate.
   if (typeof input === 'string' && isNaN(input)) {
@@ -19,6 +17,7 @@ function setInput(node, inputName, def, input) {
     }
   }
 
+  let value;
   if (isInstance(input, 'HTMLInputElement') || isInstance(input, 'HTMLSelectElement')) {
     value = input.value;
 
@@ -82,9 +81,9 @@ function setInput(node, inputName, def, input) {
   node.setInput(inputName, value);
 }
 
-function setProperty(node, name, def) {
+function setProperty(pluggable, node, name, def) {
   // todo: validate value passed to 'set'
-  Object.defineProperty(self, name, {
+  Object.defineProperty(pluggable, name, {
     configurable: true,
     enumerable: true,
     get: () => def.get.call(node),
@@ -124,13 +123,13 @@ export default class Transform extends Pluggable {
     // attach methods
     for (const key in this.node.methods) {
       if (this.node.methods.hasOwnProperty(key)) {
-        this[key] = makeMethod(this.node.methods[key]);
+        this[key] = makeMethod(this.node, this.node.methods[key]);
       }
     }
 
     for (const key in this.node.inputs) {
       if (this.node.inputs.hasOwnProperty(key)) {
-        setProperty(key, this.node.inputs[key]);
+        setProperty(this, this.node, key, this.node.inputs[key]);
       }
     }
   }

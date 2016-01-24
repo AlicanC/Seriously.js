@@ -16,6 +16,22 @@ export default class Target extends Pluggable {
     return this.node.target;
   }
 
+  set width(value) {
+    if (!isNaN(value) && value > 0 && this.node.width !== value) {
+      this.node.width = value;
+      this.node.resize();
+      this.node.setTransformDirty();
+    }
+  }
+
+  set height(value) {
+    if (!isNaN(value) && value > 0 && this.node.height !== value) {
+      this.node.height = value;
+      this.node.resize();
+      this.node.setTransformDirty();
+    }
+  }
+
   constructor(targetNode) {
     super(targetNode);
   }

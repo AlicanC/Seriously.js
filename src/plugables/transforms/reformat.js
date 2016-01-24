@@ -1,4 +1,5 @@
 import Transform from '../aaTransform.js';
+const mat4 = require('../../mat4.js');
 
 module.exports = new Transform('reformat', function () {
 	var me = this,

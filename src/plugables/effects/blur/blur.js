@@ -1,5 +1,5 @@
 import Plugin from '../../aaPlugin.js';
-const utillll = require('../../util.js');
+import FrameBuffer from '../../../FrameBuffer.js';
 
 var passes = [0.2, 0.3, 0.5, 0.8, 1],
 	finalPass = passes.length - 1,
@@ -39,8 +39,8 @@ module.exports = new Plugin('blur', function (options) {
 
 			baseShader = this.baseShader;
 
-			fbHorizontal = new utillll.FrameBuffer(gl, this.width, this.height);
-			fbVertical = new utillll.FrameBuffer(gl, this.width, this.height);
+			fbHorizontal = new FrameBuffer(gl, this.width, this.height);
+			fbVertical = new FrameBuffer(gl, this.width, this.height);
 		},
 		commonShader: true,
 		shader: function (inputs, shaderSource) {
