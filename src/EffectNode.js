@@ -1,7 +1,15 @@
 import PluggableNode from './PluggableNode.js';
 import Effect from './Effect.js';
 import ShaderProgram from './ShaderProgram.js';
-import { validateInputSpecs, identity, makeGlModel, shaderNameRegex } from './utilities.js';
+import {
+  validateInputSpecs,
+  identity,
+  makeGlModel,
+  shaderNameRegex,
+  reservedNames,
+  baseVertexShader,
+  baseFragmentShader,
+} from './utilities.js';
 
 function addShaderName(node, shaderSrc) {
   if (shaderNameRegex.test(shaderSrc)) {
@@ -234,8 +242,8 @@ export default class EffectNode extends PluggableNode {
           this.shader.destroy();
         }
         const shader = effect.shader.call(this, this.inputs, {
-          vertex: this.seriously.baseVertexShader,
-          fragment: this.seriously.baseFragmentShader,
+          vertex: baseVertexShader,
+          fragment: baseFragmentShader,
         }, this.seriously.Seriously.util);
 
         if (shader instanceof ShaderProgram) {
@@ -320,22 +328,17 @@ export default class EffectNode extends PluggableNode {
   }
 
   setInput(name, value) {
-    var input, uniform,
-      sourceKeys,
-      source,
-      me = this,
-      defaultValue;
+    const me = this;
 
     function disconnectSource() {
-      var previousSource = me.sources[name],
-        key;
+      const previousSource = me.sources[name];
 
       /*
       remove this node from targets of previously connected source node,
       but only if the source node is not being used as another input
       */
       if (previousSource) {
-        for (key in me.sources) {
+        for (const key in me.sources) {
           if (key !== name &&
               me.sources.hasOwnProperty(key) &&
               me.sources[key] === previousSource) {
@@ -347,7 +350,8 @@ export default class EffectNode extends PluggableNode {
     }
 
     if (this.effect.inputs.hasOwnProperty(name)) {
-      input = this.effect.inputs[name];
+      const input = this.effect.inputs[name];
+      let uniform;
       if (input.type === 'image') {
         // && !(value instanceof Effect) && !(value instanceof Source)) {
 
@@ -371,14 +375,15 @@ export default class EffectNode extends PluggableNode {
 
         uniform = this.sources[name];
 
-        sourceKeys = Object.keys(this.sources);
+        const sourceKeys = Object.keys(this.sources);
         if (this.inPlace === true && sourceKeys.length === 1) {
-          source = this.sources[sourceKeys[0]];
+          const source = this.sources[sourceKeys[0]];
           this.uniforms.transform = source && source.cumulativeMatrix || identity;
         } else {
           this.uniforms.transform = identity;
         }
       } else {
+        let defaultValue;
         if (this.seriously.defaultInputs[this.hook]
           && this.seriously.defaultInputs[this.hook][name] !== undefined) {
           defaultValue = this.seriously.defaultInputs[this.hook][name];
@@ -421,33 +426,29 @@ export default class EffectNode extends PluggableNode {
   }
 
   alias(inputName, aliasName) {
-    var that = this;
-
     if (reservedNames.indexOf(aliasName) >= 0) {
-      throw new Error('\'' + aliasName + '\' is a reserved name and cannot be used as an alias.');
+      throw new Error(`'${aliasName}' is a reserved name and cannot be used as an alias.`);
     }
 
     if (this.effect.inputs.hasOwnProperty(inputName)) {
       if (!aliasName) {
-        aliasName = inputName;
+        aliasName = inputName; // eslint-disable-line no-param-reassign
       }
 
-      seriously.removeAlias(aliasName);
+      this.seriously.removeAlias(aliasName);
 
-      aliases[aliasName] = {
+      this.seriously.aliases[aliasName] = {
         node: this,
-        input: inputName
+        input: inputName,
       };
 
-      Object.defineProperty(seriously, aliasName, {
+      Object.defineProperty(this.seriously, aliasName, {
         configurable: true,
         enumerable: true,
-        get: function () {
-          return that.inputs[inputName];
+        get: () => this.inputs[inputName],
+        set: (value) => {  // eslint-disable-line arrow-body-style
+          return this.setInput(inputName, value);
         },
-        set: function (value) {
-          return that.setInput(inputName, value);
-        }
       });
     }
 
@@ -482,24 +483,25 @@ export default class EffectNode extends PluggableNode {
     }
 
     function linesIntersect(a1, a2, b1, b2) {
-      var ua_t, ub_t, u_b, ua, ub;
-      ua_t = (b2.x - b1.x) * (a1.y - b1.y) - (b2.y - b1.y) * (a1.x - b1.x);
-      ub_t = (a2.x - a1.x) * (a1.y - b1.y) - (a2.y - a1.y) * (a1.x - b1.x);
-      u_b = (b2.y - b1.y) * (a2.x - a1.x) - (b2.x - b1.x) * (a2.y - a1.y);
+      /* eslint-disable camelcase */
+      const ua_t = (b2.x - b1.x) * (a1.y - b1.y) - (b2.y - b1.y) * (a1.x - b1.x);
+      const ub_t = (a2.x - a1.x) * (a1.y - b1.y) - (a2.y - a1.y) * (a1.x - b1.x);
+      const u_b = (b2.y - b1.y) * (a2.x - a1.x) - (b2.x - b1.x) * (a2.y - a1.y);
       if (u_b) {
-        ua = ua_t / u_b;
-        ub = ub_t / u_b;
+        const ua = ua_t / u_b;
+        const ub = ub_t / u_b;
         if (ua > 0 && ua <= 1 && ub > 0 && ub <= 1) {
           return {
             x: a1.x + ua * (a2.x - a1.x),
-            y: a1.y + ua * (a2.y - a1.y)
+            y: a1.y + ua * (a2.y - a1.y),
           };
         }
       }
       return false;
+      /* eslint-enable camelcase */
     }
 
-    function makeSimple(poly) {
+    function makeSimple(poly) { // eslint-disable-line no-shadow
       /*
       this uses a slow, naive approach to detecting line intersections.
       Use Bentley-Ottmann Algorithm
@@ -540,14 +542,14 @@ export default class EffectNode extends PluggableNode {
           edge1 = intersect.edge1;
           edge2 = intersect.edge2;
 
-          //make new points
-          //todo: set ids for points
+          // make new points
+          // TODO: set ids for points
           point1 = {
             x: intersect.x,
             y: intersect.y,
             prev: edge1[0],
             next: edge2[1],
-            id: vertices.length
+            id: vertices.length,
           };
           poly.vertices.push(point1);
           vertices.push(point1);
@@ -557,31 +559,31 @@ export default class EffectNode extends PluggableNode {
             y: intersect.y,
             prev: edge2[0],
             next: edge1[1],
-            id: vertices.length
+            id: vertices.length,
           };
           poly.vertices.push(point2);
           vertices.push(point1);
 
-          //modify old points
+          // modify old points
           point1.prev.next = point1;
           point1.next.prev = point1;
           point2.prev.next = point2;
           point2.next.prev = point2;
 
-          //don't bother modifying the old edges. we're just gonna throw them out
+          // don't bother modifying the old edges. we're just gonna throw them out
         }
 
-        //make new polygons
+        // make new polygons
         do {
           newPoly = {
             edges: [],
             vertices: [],
-            simple: true
+            simple: true,
           };
           newPolygons.push(newPoly);
           point = poly.vertices[0];
           head = point;
-          //while (point.next !== head && poly.vertices.length) {
+          // while (point.next !== head && poly.vertices.length) {
           do {
             i = poly.vertices.indexOf(point);
             poly.vertices.splice(i, 1);
@@ -591,33 +593,33 @@ export default class EffectNode extends PluggableNode {
           } while (point !== head);
         } while (poly.vertices.length);
 
-        //remove original polygon from list
+        // remove original polygon from list
         i = polygons.indexOf(poly);
         polygons.splice(i, 1);
 
-        //add new polygons to list
+        // add new polygons to list
         for (i = 0; i < newPolygons.length; i++) {
           polygons.push(newPolygons[i]);
         }
       } else {
-        poly.simple = true;
+        poly.simple = true; // eslint-disable-line no-param-reassign
       }
     }
 
-    function clockWise(poly) {
+    function clockWise(poly) { // eslint-disable-line no-param-reassign
       var p, q, n = poly.vertices.length,
         pv, qv, sum = 0;
       for (p = n - 1, q = 0; q < n; p = q, q++) {
         pv = poly.vertices[p];
         qv = poly.vertices[q];
-        //sum += (next.x - v.x) * (next.y + v.y);
-        //sum += (v.next.x + v.x) * (v.next.y - v.y);
+        // sum += (next.x - v.x) * (next.y + v.y);
+        // sum += (v.next.x + v.x) * (v.next.y - v.y);
         sum += pv.x * qv.y - qv.x * pv.y;
       }
       return sum > 0;
     }
 
-    function triangulate(poly) {
+    function triangulate(poly) { // eslint-disable-line no-param-reassign
       var v, points = poly.vertices,
         n, V = [], indices = [],
         nv, count, m, u, w,
@@ -646,7 +648,7 @@ export default class EffectNode extends PluggableNode {
         cXap = cx * apy - cy * apx;
         bXcp = bx * cpy - by * cpx;
 
-        return aXbp >= 0 && bXcp >=0 && cXap >=0;
+        return aXbp >= 0 && bXcp >= 0 && cXap >= 0;
       }
 
       function snip(u, v, w, n, V) {
@@ -736,26 +738,26 @@ export default class EffectNode extends PluggableNode {
     polys = makePolygonsArray(poly);
 
     for (i = 0; i < polys.length; i++) {
-      poly = polys[i];
+      poly = polys[i]; // eslint-disable-line no-param-reassign
       prev = null;
       polygon = {
         vertices: [],
-        edges: []
+        edges: [],
       };
 
       for (j = 0; j < poly.length; j++) {
         v = poly[j];
-        if (typeof v ==='object' && !isNaN(v.x) && !isNaN(v.y)) {
+        if (typeof v === 'object' && !isNaN(v.x) && !isNaN(v.y)) {
           vert = {
             x: v.x,
             y: v.y,
-            id: vertices.length
+            id: vertices.length,
           };
         } else if (v.length >= 2 && !isNaN(v[0]) && !isNaN(v[1])) {
           vert = {
             x: v[0],
             y: v[1],
-            id: vertices.length
+            id: vertices.length,
           };
         }
         if (vert) {
@@ -846,13 +848,14 @@ export default class EffectNode extends PluggableNode {
     delete this.effect;
 
     //shader
-    if (commonShaders[hook]) {
-      commonShaders[hook].count--;
-      if (!commonShaders[hook].count) {
-        delete commonShaders[hook];
+    if (this.seriously.commonShaders[hook]) {
+      this.seriously.commonShaders[hook].count--;
+      if (!this.seriously.commonShaders[hook].count) {
+        delete this.seriously.commonShaders[hook];
       }
     }
-    if (this.shader && this.shader.destroy && this.shader !== baseShader && !commonShaders[hook]) {
+    if (this.shader && this.shader.destroy && this.shader !== this.seriously.baseShader
+      && !this.seriously.commonShaders[hook]) {
       this.shader.destroy();
     }
     delete this.shader;
@@ -877,7 +880,7 @@ export default class EffectNode extends PluggableNode {
       }
     }
 
-    //targets
+    // targets
     while (this.targets.length) {
       item = this.targets.pop();
       if (item && item.removeSource) {
@@ -891,25 +894,25 @@ export default class EffectNode extends PluggableNode {
       }
     }
 
-    //remove any aliases
-    for (key in aliases) {
-      if (aliases.hasOwnProperty(key)) {
-        item = aliases[key];
+    // remove any aliases
+    for (key in this.seriously.aliases) {
+      if (this.seriously.aliases.hasOwnProperty(key)) {
+        item = this.seriously.aliases[key];
         if (item.node === this) {
-          seriously.removeAlias(key);
+          this.seriously.seriously.removeAlias(key);
         }
       }
     }
 
-    //remove self from master list of effects
-    i = effects.indexOf(this);
+    // remove self from master list of effects
+    i = this.seriously.effects.indexOf(this);
     if (i >= 0) {
-      effects.splice(i, 1);
+      this.seriously.effects.splice(i, 1);
     }
 
-    i = allEffectsByHook[hook].indexOf(this);
+    i = this.seriously.Seriously.registry.allEffectsByHook[hook].indexOf(this);
     if (i >= 0) {
-      allEffectsByHook[hook].splice(i, 1);
+      this.seriously.Seriously.registry.allEffectsByHook[hook].splice(i, 1);
     }
 
     Node.prototype.destroy.call(this);

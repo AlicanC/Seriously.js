@@ -58,7 +58,11 @@ export default class Seriously {
     requestAnimationFrame,
     shader: {
       makeNoise: require('./shaders/makeNoise.glsl'),
-      random: require('./shaders/makeNoise.glsl'),
+      random: require('./shaders/random.glsl'),
+      noiseHelpers: require('./shaders/noiseHelpers.glsl'),
+      snoise2d: require('./shaders/snoise2d.glsl'),
+      snoise3d: require('./shaders/snoise3d.glsl'),
+      snoise4d: require('./shaders/snoise4d.glsl'),
     },
   };
 
@@ -1181,33 +1185,22 @@ export default class Seriously {
 
 */
 
-import Video from './plugables/sources/video.js';
+import Video from './pluggables/sources/video.js';
 Video.plug(Seriously);
 
 /*
-Default transform - 2D
-Affine transforms
-- translate
-- rotate (degrees)
-- scale
-- skew
+// import TwoD from './pluggables/transforms/2d.js';
 
-todo: move this to a different file when we have a build tool
-*/
-import TwoD from './plugables/transforms/2d.js';
+const TwoD = require('./pluggables/transforms/2d.js');
 TwoD.plug(Seriously);
 
-/*
-todo: move this to a different file when we have a build tool
-*/
-import Flip from './plugables/transforms/flip.js';
+// import Flip from './pluggables/transforms/flip.js';
+const Flip = require('./pluggables/transforms/flip.js');
 Flip.plug(Seriously);
-
-/*
-Reformat
-todo: move this to a different file when we have a build tool
 */
-import Reformat from './plugables/transforms/reformat.js';
+
+// import Reformat from './pluggables/transforms/reformat.js';
+const Reformat = require('./pluggables/transforms/reformat.js');
 Reformat.plug(Seriously);
 
 /*
@@ -1218,12 +1211,21 @@ todo: additional transform node types
 
 module.exports = Seriously;
 
+import Blur from './pluggables/effects/blur/blur.js';
+Blur.plug(Seriously);
+
+import BrightnessContrast from './pluggables/effects/brightness-contrast/brightness-contrast.js';
+BrightnessContrast.plug(Seriously);
+
+import HueSaturation from './pluggables/effects/hue-saturation/hue-saturation.js';
+HueSaturation.plug(Seriously);
+
 // UGLY!
 const effects = ['polar', 'temperature', 'ripple',
-  'brightness-contrast', 'channels', 'hue-saturation', 'noise',
+  'channels', 'noise',
   'sepia', 'vibrance', 'vignette', 'filmgrain', 'exposure'];
 
-const blur = require('./plugables/effects/blur/blur.js');
+const blur = require('./pluggables/effects/blur/blur.js');
 if (blur.definition) {
   Seriously.plugin(blur.hook, blur.definition, blur.meta);
 } else {
@@ -1232,10 +1234,12 @@ if (blur.definition) {
 
 
 for (const effectName of effects) {
-  const effect = require(`./plugables/effects/${effectName}.js`);
+  const effect = require(`./pluggables/effects/${effectName}.js`);
   if (effect.definition) {
     Seriously.plugin(effect.hook, effect.definition, effect.meta);
   } else {
     Seriously.plugin(effect.hook, effect.meta);
   }
 }
+
+console.log('Done!');

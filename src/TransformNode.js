@@ -318,7 +318,7 @@ export default class TransformNode extends PluggableNode {
     this.render(true);
 
     if (dest === undefined) {
-      dest = new Uint8Array(width * height * 4);
+      dest = new Uint8Array(width * height * 4); // eslint-disable-line no-param-reassign
     } else if (!(isInstance(dest, 'Uint8Array'))) {
       throw new Error('Incompatible array type');
     }

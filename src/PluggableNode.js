@@ -78,9 +78,10 @@ export default class PluggableNode {
   }
 
   readPixels(x, y, width, height, dest) {
-    const nodeGl = this.gl || this.seriously.gl;
+    const gl = this.seriously.gl;
+    const nodeGl = this.gl || gl;
 
-    if (!this.seriously.gl) {
+    if (!gl) {
       // TODO: is this the best approach?
       throw new Error('Cannot read pixels until a canvas is connected');
     }
@@ -102,8 +103,8 @@ export default class PluggableNode {
       throw new Error('Incompatible array type');
     }
 
-    nodeGl.bindFramebuffer(this.gl.FRAMEBUFFER, this.frameBuffer.frameBuffer);
-    nodeGl.readPixels(x, y, width, height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, dest);
+    nodeGl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer.frameBuffer);
+    nodeGl.readPixels(x, y, width, height, gl.RGBA, gl.UNSIGNED_BYTE, dest);
 
     return dest;
   }

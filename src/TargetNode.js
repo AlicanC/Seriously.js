@@ -2,7 +2,15 @@ import PluggableNode from './PluggableNode.js';
 import Target from './Target.js';
 import FrameBuffer from './FrameBuffer.js';
 import ShaderProgram from './ShaderProgram.js';
-import { isInstance, getWebGlContext, noop, identity, outputRenderOptions } from './utilities.js';
+import {
+  isInstance,
+  getWebGlContext,
+  noop,
+  identity,
+  outputRenderOptions,
+  baseVertexShader,
+  baseFragmentShader,
+} from './utilities.js';
 const mat4 = require('./mat4.js');
 
 export default class TargetNode extends PluggableNode {
@@ -143,7 +151,7 @@ export default class TargetNode extends PluggableNode {
           frameBuffer: frameBuffer || null,
         };
         this.shader = new ShaderProgram(
-          this.gl, seriously.baseVertexShader, seriously.baseFragmentShader);
+          this.gl, baseVertexShader, baseFragmentShader);
         this.model = seriously.buildRectangleModel.call(this, this.gl);
         this.pixels = null;
 

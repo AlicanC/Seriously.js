@@ -2,12 +2,18 @@
     "extends": "airbnb",
     "parser": "babel-eslint",
     "env": {
-      "browser": true
+      "browser": true,
+      "node": true
     },
     "plugins": [
         "react"
     ],
     "rules": {
       "no-console": 0
+    },
+    "globals": {
+      "Uint16Array": true,
+      "Uint8Array": true,
+      "WeakMap": true
     }
 }

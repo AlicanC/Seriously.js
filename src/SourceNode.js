@@ -294,7 +294,7 @@ export default class SourceNode extends PluggableNode {
     const media = this.source;
 
     if (!this.seriously.gl || !media || !this.ready) {
-      return;
+      return undefined;
     }
 
     if (!this.initialized) {
@@ -302,7 +302,7 @@ export default class SourceNode extends PluggableNode {
     }
 
     if (!this.allowRefresh) {
-      return;
+      return undefined;
     }
 
     if (this.dirty) {
@@ -319,12 +319,14 @@ export default class SourceNode extends PluggableNode {
       } catch (securityError) {
         if (securityError.code === window.DOMException.SECURITY_ERR) {
           this.allowRefresh = false;
-          Seriously.logger.error('Unable to access cross-domain image');
+          console.error('Unable to access cross-domain image');
         }
       }
 
       return false;
     }
+
+    return undefined;
   }
 
   destroy() {

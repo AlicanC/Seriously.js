@@ -4,4 +4,4 @@ export default class Source extends Plugable {
   plug(Seriously) {
     super.plug(Seriously, 'source');
   }
-};
+}

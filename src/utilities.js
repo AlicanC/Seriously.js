@@ -53,13 +53,12 @@ export function buildRectangleModel(gl) {
   return makeGlModel(shape, gl);
 }
 
-export const baseVertexShader = require('./shaders/baseVertex.glsl');
-
-export const baseFragmentShader = require('./shaders/baseFragment.glsl');
+export const baseVertexShader = require('./shaders/base.v.glsl');
+export const baseFragmentShader = require('./shaders/base.f.glsl');
 
 export function isInstance(obj, proto) {
   if (!proto) {
-    proto = 'HTMLElement';
+    proto = 'HTMLElement'; // eslint-disable-line no-param-reassign
   }
 
   if (obj instanceof window[proto]) {
@@ -71,7 +70,7 @@ export function isInstance(obj, proto) {
   }
 
   while (obj) {
-    obj = Object.getPrototypeOf(obj);
+    obj = Object.getPrototypeOf(obj); // eslint-disable-line no-param-reassign
     if (obj && obj.constructor.name === proto) {
       return true;
     }
@@ -104,11 +103,9 @@ export function getWebGlContext(canvas, options) {
 }
 
 export function getElement(input, tags) {
-  var element,
-    tag;
-
+  let element;
   if (typeof input === 'string') {
-    //element = document.getElementById(input) || document.getElementsByTagName(input)[0];
+    // element = document.getElementById(input) || document.getElementsByTagName(input)[0];
     element = document.querySelector(input);
   } else if (!input) {
     return false;
@@ -122,7 +119,7 @@ export function getElement(input, tags) {
     return input;
   }
 
-  tag = element.tagName.toLowerCase();
+  const tag = element.tagName.toLowerCase();
   if (tags && tags.indexOf(tag) < 0) {
     return input;
   }
@@ -392,17 +389,14 @@ export const identity = new Float32Array([
 ]);
 
 export function colorArrayToHex(color) {
-  var i,
-    val,
-    hex,
-    s = '#',
-    len = color[3] < 1 ? 4 : 3;
+  let s = '#';
+  const len = color[3] < 1 ? 4 : 3;
 
-  for (i = 0; i < len; i++) {
-    val = Math.min(255, Math.round(color[i] * 255 || 0));
-    hex = val.toString(16);
+  for (let i = 0; i < len; i++) {
+    const val = Math.min(255, Math.round(color[i] * 255 || 0));
+    let hex = val.toString(16);
     if (val < 16) {
-      hex = '0' + hex;
+      hex = `0${hex}`;
     }
     s += hex;
   }
@@ -447,7 +441,7 @@ export function checkSource(source) {
       if (textureError.code === window.DOMException.SECURITY_ERR) {
         console.log('Unable to access cross-domain image');
       } else {
-        console.error('Error storing image to texture: ' + textureError.message);
+        console.error(`Error storing image to texture: ${textureError.message}`);
       }
       ctx.deleteTexture(texture);
       return false;
@@ -462,7 +456,7 @@ export function checkSource(source) {
       if (drawImageError.code === window.DOMException.SECURITY_ERR) {
         console.log('Unable to access cross-domain image');
       } else {
-        console.error('Error drawing image to canvas: ' + drawImageError.message);
+        console.error(`Error drawing image to canvas: ${drawImageError.message}`);
       }
       return false;
     }
@@ -475,10 +469,10 @@ export function checkSource(source) {
 }
 
 export function hslToRgb(h, s, l, a, out) {
-  function hueToRgb(m1, m2, h) {
-    h = h % 1;
+  function hueToRgb(m1, m2, h) {  // eslint-disable-line no-shadow
+    h = h % 1;  // eslint-disable-line no-param-reassign
     if (h < 0) {
-      h += 1;
+      h += 1;  // eslint-disable-line no-param-reassign
     }
     if (h < 1 / 6) {
       return m1 + (m2 - m1) * h * 6;
@@ -487,27 +481,27 @@ export function hslToRgb(h, s, l, a, out) {
       return m2;
     }
     if (h < 2 / 3) {
-      return m1 + (m2 - m1) * (2/3 - h) * 6;
+      return m1 + (m2 - m1) * (2 / 3 - h) * 6;
     }
     return m1;
   }
 
-  var m1, m2;
+  let m2;
   if (l < 0.5) {
     m2 = l * (s + 1);
   } else {
     m2 = l + s - l * s;
   }
-  m1 = l * 2 - m2;
+  const m1 = l * 2 - m2;
 
   if (!out) {
-    out = [];
+    out = []; // eslint-disable-line no-param-reassign
   }
 
-  out[0] = hueToRgb(m1, m2, h + 1/3);
-  out[1] = hueToRgb(m1, m2, h);
-  out[2] = hueToRgb(m1, m2, h - 1/3);
-  out[3] = a;
+  out[0] = hueToRgb(m1, m2, h + 1 / 3);  // eslint-disable-line no-param-reassign
+  out[1] = hueToRgb(m1, m2, h);  // eslint-disable-line no-param-reassign
+  out[2] = hueToRgb(m1, m2, h - 1 / 3);  // eslint-disable-line no-param-reassign
+  out[3] = a;  // eslint-disable-line no-param-reassign
 
   return out;
 }

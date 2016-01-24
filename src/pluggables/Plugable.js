@@ -13,9 +13,9 @@ export default class Plugable {
   plug(Seriously, socket) {
     console.log(`Plugging ${this.hook} to ${socket}...`);
     if (this.definition) {
-  		Seriously[socket](this.hook, this.definition, this.meta);
-  	} else {
-  		Seriously[socket](this.hook, this.meta);
-  	}
+  		        Seriously[socket](this.hook, this.definition, this.meta);
+  	    } else {
+  		        Seriously[socket](this.hook, this.meta);
+  	    }
   }
 }
