@@ -1,124 +1,50 @@
-const Target = module.exports = function Target(targetNode) {
-  var me = targetNode;
+import Pluggable from './Pluggable.js';
 
-  //priveleged accessor methods
-  Object.defineProperties(this, {
-    source: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        if (me.source) {
-          return me.source.pub;
-        }
-      },
-      set: function (value) {
-        me.setSource(value);
-      }
-    },
-    original: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.target;
-      }
-    },
-    width: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.width;
-      },
-      set: function (value) {
-        if (!isNaN(value) && value >0 && me.width !== value) {
-          me.width = value;
-          me.resize();
-          me.setTransformDirty();
-        }
-      }
-    },
-    height: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.height;
-      },
-      set: function (value) {
-        if (!isNaN(value) && value >0 && me.height !== value) {
-          me.height = value;
-          me.resize();
-          me.setTransformDirty();
-        }
-      }
-    },
-    id: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.id;
-      }
+export default class Target extends Pluggable {
+  get source() {
+    if (!this.node.source) {
+      return undefined;
     }
-  });
 
-  this.render = function () {
-    me.render();
-  };
+    return this.node.source.pub;
+  }
+  set source(value) {
+    this.node.setSource(value);
+  }
 
-  this.readPixels = function (x, y, width, height, dest) {
-    return me.readPixels(x, y, width, height, dest);
-  };
+  get original() {
+    return this.node.target;
+  }
 
-  this.on = function (eventName, callback) {
-    me.on(eventName, callback);
-  };
+  constructor(targetNode) {
+    super(targetNode);
+  }
 
-  this.off = function (eventName, callback) {
-    me.off(eventName, callback);
-  };
+  render() {
+    this.node.render();
+  }
 
-  this.go = function (options) {
-    me.go(options);
-  };
+  readPixels(...args) {
+    return this.node.readPixels(...args);
+  }
 
-  this.stop = function () {
-    me.stop();
-  };
+  go(...args) {
+    this.node.go(...args);
+  }
 
-  this.getTexture = function () {
-    return me.frameBuffer.texture;
-  };
+  stop(...args) {
+    this.node.stop(...args);
+  }
 
-  this.destroy = function () {
-    var i,
-      descriptor;
+  getTexture() {
+    return this.node.frameBuffer.texture;
+  }
 
-    me.destroy();
-
-    for (i in this) {
-      if (this.hasOwnProperty(i) && i !== 'isDestroyed' && i !== 'id') {
-        descriptor = Object.getOwnPropertyDescriptor(this, i);
-        if (descriptor.get || descriptor.set ||
-            typeof this[i] !== 'function') {
-          delete this[i];
-        } else {
-          this[i] = nop;
-        }
-      }
-    }
-  };
-
-  this.inputs = function (name) {
+  inputs(name) { // eslint-disable-line no-unused-vars
     return {
       source: {
-        type: 'image'
-      }
+        type: 'image',
+      },
     };
-  };
-
-  this.isDestroyed = function () {
-    return me.isDestroyed;
-  };
-
-  this.isReady = function () {
-    return me.ready;
-  };
-};
+  }
+}

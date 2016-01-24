@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "babel src --out-dir dist",
-    "watch": "babel src --out-dir dist --watch",
+    "watch": "babel src --out-dir dist --source-maps true --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -24,6 +24,7 @@
   "homepage": "https://github.com/AlicanC/Seriously.js#readme",
   "devDependencies": {
     "babel-cli": "^6.4.5",
+    "babel-preset-stage-1": "^6.3.13",
     "eslint-config-airbnb": "^4.0.0",
     "eslint-plugin-react": "^3.15.0"
   }

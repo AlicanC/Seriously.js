@@ -1,220 +1,174 @@
-const util = require('./util.js');
-const isInstance = util.isInstance;
+import Pluggable from './Pluggable.js';
 
-const Effect = module.exports = function Effect(effectNode) {
-  var name, me = effectNode;
+import { isInstance, getElement, colorArrayToHex } from './utilities.js';
 
-  function setInput(inputName, input) {
-    var lookup, value, effectInput, i;
+function setInput(node, inputName, input) {
+  var lookup, value, effectInput, i; // eslint-disable-line
 
-    effectInput = me.effect.inputs[inputName];
+  effectInput = node.effect.inputs[inputName];
 
-    lookup = me.inputElements[inputName];
+  lookup = node.inputElements[inputName];
 
-    if (typeof input === 'string' && isNaN(input)) {
-      if (effectInput.type === 'enum') {
-        if (!effectInput.options.hasOwnProperty(input)) {
-          input = getElement(input, ['select']);
-        }
-      } else if (effectInput.type === 'number' || effectInput.type === 'boolean') {
-        input = getElement(input, ['input', 'select']);
-      } else if (effectInput.type === 'image') {
-        input = getElement(input, ['canvas', 'img', 'video']);
+  if (typeof input === 'string' && isNaN(input)) {
+    if (effectInput.type === 'enum') {
+      if (!effectInput.options.hasOwnProperty(input)) {
+        input = getElement(input, ['select']); // eslint-disable-line no-param-reassign
       }
-      //todo: color? date/time?
+    } else if (effectInput.type === 'number' || effectInput.type === 'boolean') {
+      input = getElement(input, ['input', 'select']); // eslint-disable-line no-param-reassign
+    } else if (effectInput.type === 'image') {
+      input = getElement(input, ['canvas', 'img', 'video']); // eslint-disable-line no-param-reassign, max-len
+    }
+    // TODO: color? date/time?
+  }
+
+  if (isInstance(input, 'HTMLInputElement') || isInstance(input, 'HTMLSelectElement')) {
+    value = input.value;
+
+    if (lookup && lookup.element !== input) {
+      lookup.element.removeEventListener('change', lookup.listener, true);
+      lookup.element.removeEventListener('input', lookup.listener, true);
+      delete node.inputElements[inputName]; // eslint-disable-line no-param-reassign
+      lookup = null;
     }
 
-    if (isInstance(input, 'HTMLInputElement') || isInstance(input, 'HTMLSelectElement')) {
-      value = input.value;
+    if (!lookup) {
+      lookup = {
+        element: input,
+        listener: (function (name, element) { // eslint-disable-line
+          return function () { // eslint-disable-line
+            var oldValue, newValue; // eslint-disable-line
 
-      if (lookup && lookup.element !== input) {
-        lookup.element.removeEventListener('change', lookup.listener, true);
-        lookup.element.removeEventListener('input', lookup.listener, true);
-        delete me.inputElements[inputName];
-        lookup = null;
-      }
+            if (input.type === 'checkbox') {
+              // special case for check box
+              oldValue = input.checked;
+            } else {
+              oldValue = element.value;
+            }
+            newValue = node.setInput(name, oldValue);
 
-      if (!lookup) {
-        lookup = {
-          element: input,
-          listener: (function (name, element) {
-            return function () {
-              var oldValue, newValue;
+            // special case for color type
+            if (effectInput.type === 'color') {
+              newValue = colorArrayToHex(newValue).substr(0, 7);
+            }
 
-              if (input.type === 'checkbox') {
-                //special case for check box
-                oldValue = input.checked;
-              } else {
-                oldValue = element.value;
-              }
-              newValue = me.setInput(name, oldValue);
+            // if input validator changes our value, update HTML Element
+            // TODO: make this optional...somehow
+            if (newValue !== oldValue) {
+              element.value = newValue; // eslint-disable-line no-param-reassign
+            }
+          };
+        }(inputName, input)),
+      };
 
-              //special case for color type
-              if (effectInput.type === 'color') {
-                newValue = colorArrayToHex(newValue).substr(0, 7);
-              }
-
-              //if input validator changes our value, update HTML Element
-              //todo: make this optional...somehow
-              if (newValue !== oldValue) {
-                element.value = newValue;
-              }
-            };
-          }(inputName, input))
-        };
-
-        me.inputElements[inputName] = lookup;
-        if (input.type === 'range') {
-          input.addEventListener('input', lookup.listener, true);
-          input.addEventListener('change', lookup.listener, true);
-        } else {
-          input.addEventListener('change', lookup.listener, true);
-        }
-      }
-
-      if (lookup && input.type === 'checkbox') {
-        value = input.checked;
-      }
-    } else {
-      if (lookup) {
-        lookup.element.removeEventListener('change', lookup.listener, true);
-        lookup.element.removeEventListener('input', lookup.listener, true);
-        delete me.inputElements[inputName];
-      }
-      value = input;
-    }
-
-    me.setInput(inputName, value);
-    return me.inputs[inputName];
-  }
-
-  function makeImageSetter(inputName) {
-    return function (value) {
-      var val = setInput(inputName, value);
-      return val && val.pub;
-    };
-  }
-
-  function makeImageGetter(inputName) {
-    return function () {
-      var val = me.inputs[inputName];
-      return val && val.pub;
-    };
-  }
-
-  function makeSetter(inputName) {
-    return function (value) {
-      return setInput(inputName, value);
-    };
-  }
-
-  function makeGetter(inputName) {
-    return function () {
-      return me.inputs[inputName];
-    };
-  }
-
-  //priveleged publicly accessible methods/setters/getters
-  //todo: provide alternate set/get methods
-  for (name in me.effect.inputs) {
-    if (me.effect.inputs.hasOwnProperty(name)) {
-      if (this[name] === undefined) {
-        if (me.effect.inputs[name].type === 'image') {
-          Object.defineProperty(this, name, {
-            configurable: true,
-            enumerable: true,
-            get: makeImageGetter(name),
-            set: makeImageSetter(name)
-          });
-        } else {
-          Object.defineProperty(this, name, {
-            configurable: true,
-            enumerable: true,
-            get: makeGetter(name),
-            set: makeSetter(name)
-          });
-        }
+      node.inputElements[inputName] = lookup; // eslint-disable-line no-param-reassign
+      if (input.type === 'range') {
+        input.addEventListener('input', lookup.listener, true);
+        input.addEventListener('change', lookup.listener, true);
       } else {
-        //todo: this is temporary. get rid of it.
-        throw new Error('Cannot overwrite Seriously.' + name);
+        input.addEventListener('change', lookup.listener, true);
+      }
+    }
+
+    if (lookup && input.type === 'checkbox') {
+      value = input.checked;
+    }
+  } else {
+    if (lookup) {
+      lookup.element.removeEventListener('change', lookup.listener, true);
+      lookup.element.removeEventListener('input', lookup.listener, true);
+      delete node.inputElements[inputName]; // eslint-disable-line no-param-reassign
+    }
+    value = input;
+  }
+
+  node.setInput(inputName, value);
+  return node.inputs[inputName];
+}
+
+function makeImageSetter(node, inputName) {
+  return (value) => {
+    const val = setInput(node, inputName, value);
+    return val && val.pub;
+  };
+}
+
+function makeImageGetter(node, inputName) {
+  return () => {
+    const val = node.inputs[inputName];
+    return val && val.pub;
+  };
+}
+
+function makeSetter(node, inputName) {
+  return (value) => setInput(node, inputName, value);
+}
+
+function makeGetter(node, inputName) {
+  return () => node.inputs[inputName];
+}
+
+export default class Effect extends Pluggable {
+  get effect() {
+    return this.node.hook;
+  }
+
+  get title() {
+    return this.node.effect.title || this.node.hook;
+  }
+
+  constructor(effectNode) {
+    super(effectNode);
+
+    // TODO: provide alternate set/get methods
+    for (const name in this.node.effect.inputs) {
+      if (this.node.effect.inputs.hasOwnProperty(name)) {
+        if (this[name] === undefined) {
+          if (this.node.effect.inputs[name].type === 'image') {
+            Object.defineProperty(this, name, {
+              configurable: true,
+              enumerable: true,
+              get: makeImageGetter(this.node, name),
+              set: makeImageSetter(this.node, name),
+            });
+          } else {
+            Object.defineProperty(this, name, {
+              configurable: true,
+              enumerable: true,
+              get: makeGetter(this.node, name),
+              set: makeSetter(this.node, name),
+            });
+          }
+        } else {
+          // TODO: this is temporary. get rid of it.
+          throw new Error(`Cannot overwrite Seriously.${name}`);
+        }
       }
     }
   }
 
-  Object.defineProperties(this, {
-    effect: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.hook;
-      }
-    },
-    title: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.effect.title || me.hook;
-      }
-    },
-    width: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.width;
-      }
-    },
-    height: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.height;
-      }
-    },
-    id: {
-      enumerable: true,
-      configurable: true,
-      get: function () {
-        return me.id;
-      }
-    }
-  });
-
-  this.render = function () {
-    me.render();
+  render(...args) {
+    this.node.render(...args);
     return this;
-  };
+  }
 
-  this.readPixels = function (x, y, width, height, dest) {
-    return me.readPixels(x, y, width, height, dest);
-  };
+  readPixels(...args) {
+    return this.node.readPixels(...args);
+  }
 
-  this.on = function (eventName, callback) {
-    me.on(eventName, callback);
-  };
-
-  this.off = function (eventName, callback) {
-    me.off(eventName, callback);
-  };
-
-  this.inputs = function (name) {
-    var result,
-      input,
-      inputs,
-      i,
-      key;
-
-    inputs = me.effect.inputs;
+  inputs(name) {
+    const inputs = this.node.effect.inputs;
 
     if (name) {
-      input = inputs[name];
+      const input = inputs[name];
       if (!input) {
         return null;
       }
 
-      result = {
+      const result = {
         type: input.type,
         defaultValue: input.defaultValue,
-        title: input.title || name
+        title: input.title || name,
       };
 
       if (input.type === 'number') {
@@ -223,7 +177,7 @@ const Effect = module.exports = function Effect(effectNode) {
         result.step = input.step;
         result.mod = input.mod;
       } else if (input.type === 'enum') {
-        //make a copy
+        // make a copy
         result.options = Object.assign({}, input.options);
       } else if (input.type === 'vector') {
         result.dimensions = input.dimensions;
@@ -236,48 +190,21 @@ const Effect = module.exports = function Effect(effectNode) {
       return result;
     }
 
-    result = {};
-    for (key in inputs) {
+    const result = {};
+    for (const key in inputs) {
       if (inputs.hasOwnProperty(key)) {
         result[key] = this.inputs(key);
       }
     }
     return result;
-  };
+  }
 
-  this.alias = function (inputName, aliasName) {
-    me.alias(inputName, aliasName);
+  alias(...args) {
+    this.node.alias(...args);
     return this;
-  };
+  }
 
-  this.matte = function (polygons) {
-    me.matte(polygons);
-  };
-
-  this.destroy = function () {
-    var i,
-      descriptor;
-
-    me.destroy();
-
-    for (i in this) {
-      if (this.hasOwnProperty(i) && i !== 'isDestroyed' && i !== 'id') {
-        descriptor = Object.getOwnPropertyDescriptor(this, i);
-        if (descriptor.get || descriptor.set ||
-            typeof this[i] !== 'function') {
-          delete this[i];
-        } else {
-          this[i] = nop;
-        }
-      }
-    }
-  };
-
-  this.isDestroyed = function () {
-    return me.isDestroyed;
-  };
-
-  this.isReady = function () {
-    return me.ready;
-  };
-};
+  matte(...args) {
+    this.node.matte(...args);
+  }
+}

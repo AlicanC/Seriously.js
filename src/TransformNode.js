@@ -1,58 +1,52 @@
-const registry = require('./registry.js');
-const util = require('./util.js');
-const Node = require('./Node.js');
-const Transform = require('./Transform.js');
+import PluggableNode from './PluggableNode.js';
+import Transform from './Transform.js';
+import FrameBuffer from './FrameBuffer.js';
+import { isInstance, validateInputSpecs, reservedNames, identity } from './utilities.js';
+const mat4 = require('./mat4.js');
 
-let randomVars;
-const TransformNode = module.exports = function TransformNode(arandomVars, hook, options) {
-  randomVars = arandomVars;
-  var key,
-    input,
-    initialValue,
-    defaultValue,
-    defaults;
+export default class TransformNode extends PluggableNode {
+  constructor(seriously, hook, options) {
+    super(seriously);
 
-  this.matrix = new Float32Array(16);
-  this.cumulativeMatrix = new Float32Array(16);
+    this.matrix = new Float32Array(16);
+    this.cumulativeMatrix = new Float32Array(16);
 
-  this.ready = false;
-  this.width = 1;
-  this.height = 1;
+    this.ready = false;
+    this.width = 1;
+    this.height = 1;
 
-  this.seriously = randomVars.seriously;
+    this.transformRef = seriously.Seriously.registry.transforms[hook];
+    this.hook = hook;
 
-  this.transformRef = registry.seriousTransforms[hook];
-  this.hook = hook;
-  this.id = util.nodeId;
-  util.nodeId++;
+    this.options = options;
+    this.sources = null;
+    this.targets = [];
+    this.inputElements = {};
+    this.inputs = {};
+    this.methods = {};
+    this.listeners = {};
 
-  this.options = options;
-  this.sources = null;
-  this.targets = [];
-  this.inputElements = {};
-  this.inputs = {};
-  this.methods = {};
-  this.listeners = {};
+    this.texture = null;
+    this.frameBuffer = null;
+    this.uniforms = null;
 
-  this.texture = null;
-  this.frameBuffer = null;
-  this.uniforms = null;
+    this.dirty = true;
+    this.transformDirty = true;
+    this.renderDirty = false;
+    this.isDestroyed = false;
+    this.transformed = false;
 
-  this.dirty = true;
-  this.transformDirty = true;
-  this.renderDirty = false;
-  this.isDestroyed = false;
-  this.transformed = false;
+    this.plugin = Object.assign({}, this.transformRef);
+    if (this.transformRef.definition) {
+      Object.assign(this.plugin, this.transformRef.definition.call(this, options));
+    }
 
-  this.plugin = Object.assign({}, this.transformRef);
-  if (this.transformRef.definition) {
-    Object.assign(this.plugin, this.transformRef.definition.call(this, options));
-  }
-
-  // set up inputs and methods
-  for (key in this.plugin.inputs) {
-    if (this.plugin.inputs.hasOwnProperty(key)) {
-      input = this.plugin.inputs[key];
+    // set up inputs and methods
+    for (const key in this.plugin.inputs) {
+      if (!this.plugin.inputs.hasOwnProperty(key)) {
+        continue;
+      }
+      const input = this.plugin.inputs[key];
 
       if (input.method && typeof input.method === 'function') {
         this.methods[key] = input.method;
@@ -60,23 +54,26 @@ const TransformNode = module.exports = function TransformNode(arandomVars, hook,
         this.inputs[key] = input;
       }
     }
-  }
-  util.validateInputSpecs(this.plugin);
 
-  // set default value for all inputs (no defaults for methods)
-  defaults = randomVars.defaultInputs[hook];
-  for (key in this.plugin.inputs) {
-    if (this.plugin.inputs.hasOwnProperty(key)) {
-      input = this.plugin.inputs[key];
+    validateInputSpecs(this.plugin);
+
+    // set default value for all inputs (no defaults for methods)
+    const defaults = seriously.defaultInputs[hook];
+    for (const key in this.plugin.inputs) {
+      if (!this.plugin.inputs.hasOwnProperty(key)) {
+        continue;
+      }
+
+      const input = this.plugin.inputs[key];
 
       if (typeof input.set === 'function' && typeof input.get === 'function' &&
           typeof input.method !== 'function') {
-        initialValue = input.get.call(this);
-        defaultValue = input.defaultValue === undefined ? initialValue : input.defaultValue;
+        const initialValue = input.get.call(this);
+        let defaultValue = input.defaultValue === undefined ? initialValue : input.defaultValue;
         defaultValue = input.validate.call(this, defaultValue, input, initialValue);
         if (defaults && defaults[key] !== undefined) {
           defaultValue = input.validate
-          .call(this, defaults[key], input, input.defaultValue, defaultValue);
+            .call(this, defaults[key], input, input.defaultValue, defaultValue);
           defaults[key] = defaultValue;
         }
         if (defaultValue !== initialValue) {
@@ -84,128 +81,117 @@ const TransformNode = module.exports = function TransformNode(arandomVars, hook,
         }
       }
     }
+
+    seriously.nodes.push(this);
+    seriously.nodesById[this.id] = this; // eslint-disable-line no-param-reassign
+
+    this.pub = new Transform(this);
+
+    seriously.transforms.push(this);
+
+    seriously.Seriously.registry.allTransformsByHook[hook].push(this);
   }
 
-  randomVars.nodes.push(this);
-  randomVars.nodesById[this.id] = this;
+  setDirty() {
+    this.renderDirty = true;
+    super.setDirty();
+  }
 
-  this.pub = new Transform(this);
-
-  randomVars.transforms.push(this);
-
-  registry.allTransformsByHook[hook].push(this);
-};
-
-TransformNode.prototype = Object.create(Node.prototype);
-TransformNode.prototype.constructor = TransformNode;
-
-TransformNode.prototype.setDirty = function () {
-  this.renderDirty = true;
-  Node.prototype.setDirty.call(this);
-};
-
-TransformNode.prototype.setTransformDirty = function () {
-  var i,
-    target;
-  this.transformDirty = true;
-  this.dirty = true;
-  this.renderDirty = true;
-  for (i = 0; i < this.targets.length; i++) {
-    target = this.targets[i];
-    if (target.setTransformDirty) {
-      target.setTransformDirty();
-    } else {
-      target.setDirty();
+  setTransformDirty() {
+    this.transformDirty = true;
+    this.dirty = true;
+    this.renderDirty = true;
+    for (const target of this.targets) {
+      if (target.setTransformDirty) {
+        target.setTransformDirty();
+      } else {
+        target.setDirty();
+      }
     }
   }
-};
 
-TransformNode.prototype.resize = function () {
-  var i;
+  resize() {
+    super.resize();
 
-  Node.prototype.resize.call(this);
+    if (this.plugin.resize) {
+      this.plugin.resize.call(this);
+    }
 
-  if (this.plugin.resize) {
-    this.plugin.resize.call(this);
+    for (const target of this.targets) {
+      target.resize();
+    }
+
+    this.setTransformDirty();
   }
 
-  for (i = 0; i < this.targets.length; i++) {
-    this.targets[i].resize();
-  }
+  setSource(source) {
+    // TODO: what if source is null/undefined/false
 
-  this.setTransformDirty();
-};
+    const newSource = this.seriously.findInputNode(source);
 
-TransformNode.prototype.setSource = function (source) {
-  var newSource;
-
-  //todo: what if source is null/undefined/false
-
-  newSource = findInputNode(source);
-
-  if (newSource === this.source) {
-    return;
-  }
-
-  if (traceSources(newSource, this)) {
-    throw new Error('Attempt to make cyclical connection.');
-  }
-
-  if (this.source) {
-    this.source.removeTarget(this);
-  }
-  this.source = newSource;
-  newSource.addTarget(this);
-
-  if (newSource && newSource.ready) {
-    this.setReady();
-  } else {
-    this.setUnready();
-  }
-  this.resize();
-};
-
-TransformNode.prototype.addTarget = function (target) {
-  var i;
-  for (i = 0; i < this.targets.length; i++) {
-    if (this.targets[i] === target) {
+    if (newSource === this.source) {
       return;
     }
-  }
 
-  this.targets.push(target);
-};
+    if (this.seriously.traceSources(newSource, this)) {
+      throw new Error('Attempt to make cyclical connection.');
+    }
 
-TransformNode.prototype.removeTarget = function (target) {
-  var i = this.targets && this.targets.indexOf(target);
-  if (i >= 0) {
-    this.targets.splice(i, 1);
-  }
+    if (this.source) {
+      this.source.removeTarget(this);
+    }
+    this.source = newSource;
+    newSource.addTarget(this);
 
-  if (this.targets && this.targets.length) {
+    if (newSource && newSource.ready) {
+      this.setReady();
+    } else {
+      this.setUnready();
+    }
     this.resize();
   }
-};
 
-TransformNode.prototype.setInput = function (name, value) {
-  var input,
-    defaultValue,
-    previous;
+  addTarget(target) {
+    for (const aTarget of this.targets) {
+      if (aTarget === target) {
+        return;
+      }
+    }
 
-  if (this.plugin.inputs.hasOwnProperty(name)) {
-    input = this.plugin.inputs[name];
+    this.targets.push(target);
+  }
 
-    if (randomVars.defaultInputs[this.hook] && randomVars.defaultInputs[this.hook][name] !== undefined) {
-      defaultValue = randomVars.defaultInputs[this.hook][name];
+  removeTarget(target) {
+    const i = this.targets && this.targets.indexOf(target);
+    if (i >= 0) {
+      this.targets.splice(i, 1);
+    }
+
+    if (this.targets && this.targets.length) {
+      this.resize();
+    }
+  }
+
+  setInput(name, value) {
+    if (!this.plugin.inputs.hasOwnProperty(name)) {
+      return undefined;
+    }
+
+    const input = this.plugin.inputs[name];
+
+    let defaultValue;
+    if (this.seriously.defaultInputs[this.hook]
+      && this.seriously.defaultInputs[this.hook][name] !== undefined) {
+      defaultValue = this.seriously.defaultInputs[this.hook][name];
     } else {
       defaultValue = input.defaultValue;
     }
 
-    previous = input.get.call(this);
+    const previous = input.get.call(this);
     if (defaultValue === undefined) {
       defaultValue = previous;
     }
-    value = input.validate.call(this, value, input, defaultValue, previous);
+    value = input.validate.call(this, value, input, defaultValue, previous); // eslint-disable-line no-param-reassign, max-len
 
     if (input.set.call(this, value)) {
       this.setTransformDirty();
@@ -213,211 +199,203 @@ TransformNode.prototype.setInput = function (name, value) {
 
     return input.get.call(this);
   }
-};
 
-TransformNode.prototype.alias = function (inputName, aliasName) {
-  var me = this,
-    input,
-    def;
-
-  if (reservedNames.indexOf(aliasName) >= 0) {
-    throw new Error('\'' + aliasName + '\' is a reserved name and cannot be used as an alias.');
-  }
-
-  if (this.plugin.inputs.hasOwnProperty(inputName)) {
-    if (!aliasName) {
-      aliasName = inputName;
+  alias(inputName, aliasName) {
+    if (reservedNames.indexOf(aliasName) >= 0) {
+      throw new Error(`'${aliasName}' is a reserved name and cannot be used as an alias.`);
     }
 
-    seriously.removeAlias(aliasName);
+    if (this.plugin.inputs.hasOwnProperty(inputName)) {
+      if (!aliasName) {
+        aliasName = inputName; // eslint-disable-line no-param-reassign
+      }
 
-    input = this.inputs[inputName];
-    if (input) {
-      def = me.inputs[inputName];
-      Object.defineProperty(seriously, aliasName, {
-        configurable: true,
-        enumerable: true,
-        get: function () {
-          return def.get.call(me);
-        },
-        set: function (val) {
-          if (def.set.call(me, val)) {
-            me.setTransformDirty();
-          }
-        }
-      });
-    } else {
-      input = this.methods[inputName];
+      this.seriously.removeAlias(aliasName);
+
+      let input = this.inputs[inputName];
       if (input) {
-        def = input;
-        seriously[aliasName] = function () {
-          if (def.apply(me, arguments)) {
-            me.setTransformDirty();
-          }
+        const def = this.inputs[inputName];
+        Object.defineProperty(this.seriously, aliasName, {
+          configurable: true,
+          enumerable: true,
+          get: () => def.get.call(this),
+          set: (val) => {
+            if (def.set.call(this, val)) {
+              this.setTransformDirty();
+            }
+          },
+        });
+      } else {
+        input = this.methods[inputName];
+        if (input) {
+          const def = input;
+          this.seriously[aliasName] = () => {
+            if (def.apply(this, arguments)) {
+              this.setTransformDirty();
+            }
+          };
+        }
+      }
+
+      if (input) {
+        this.seriously.aliases[aliasName] = {
+          node: this,
+          input: inputName,
         };
       }
     }
 
-    if (input) {
-      aliases[aliasName] = {
-        node: this,
-        input: inputName
-      };
-    }
+    return this;
   }
 
-  return this;
-};
+  render(renderTransform) {
+    if (!this.source) {
+      if (this.transformDirty) {
+        mat4.copy(this.cumulativeMatrix, this.matrix);
+        this.transformDirty = false;
+      }
+      this.texture = null;
+      this.dirty = false;
 
-TransformNode.prototype.render = function (renderTransform) {
-  if (!this.source) {
+      return undefined;
+    }
+
+    this.source.render();
+
     if (this.transformDirty) {
-      mat4.copy(this.cumulativeMatrix, this.matrix);
+      if (this.transformed) {
+        // use this.matrix
+        if (this.source.cumulativeMatrix) {
+          mat4.multiply(this.cumulativeMatrix, this.matrix, this.source.cumulativeMatrix);
+        } else {
+          mat4.copy(this.cumulativeMatrix, this.matrix);
+        }
+      } else {
+        // copy source.cumulativeMatrix
+        mat4.copy(this.cumulativeMatrix, this.source.cumulativeMatrix || identity);
+      }
+
       this.transformDirty = false;
     }
-    this.texture = null;
+
+    if (renderTransform && this.seriously.gl) {
+      if (this.renderDirty) {
+        if (!this.frameBuffer) {
+          this.uniforms = {
+            resolution: [this.width, this.height],
+          };
+          this.frameBuffer = new FrameBuffer(this.seriously.gl, this.width, this.height);
+        }
+
+        this.uniforms.source = this.source.texture;
+        this.uniforms.transform = this.cumulativeMatrix || identity;
+        this.seriously.draw(this.seriously.baseShader, this.seriously.rectangleModel,
+          this.uniforms, this.frameBuffer.frameBuffer, this);
+
+        this.renderDirty = false;
+      }
+      this.texture = this.frameBuffer.texture;
+    } else if (this.source) {
+      this.texture = this.source.texture;
+    } else {
+      this.texture = null;
+    }
+
     this.dirty = false;
 
-    return;
+    return this.texture;
   }
 
-  this.source.render();
+  readPixels(x, y, width, height, dest) {
+    const nodeGl = this.gl || this.seriously.gl;
 
-  if (this.transformDirty) {
-    if (this.transformed) {
-      //use this.matrix
-      if (this.source.cumulativeMatrix) {
-        mat4.multiply(this.cumulativeMatrix, this.matrix, this.source.cumulativeMatrix);
-      } else {
-        mat4.copy(this.cumulativeMatrix, this.matrix);
+    if (!this.seriously.gl) {
+      // TODO: is this the best approach?
+      throw new Error('Cannot read pixels until a canvas is connected');
+    }
+
+    // TODO: check on x, y, width, height
+    this.render(true);
+
+    if (dest === undefined) {
+      dest = new Uint8Array(width * height * 4);
+    } else if (!(isInstance(dest, 'Uint8Array'))) {
+      throw new Error('Incompatible array type');
+    }
+
+    nodeGl.bindFramebuffer(this.seriously.gl.FRAMEBUFFER, this.frameBuffer.frameBuffer);
+    nodeGl.readPixels(x, y, width, height,
+      this.seriously.gl.RGBA, this.seriously.gl.UNSIGNED_BYTE, dest);
+
+    return dest;
+  }
+
+  destroy() {
+    const hook = this.hook;
+
+    // let effect destroy itself
+    if (this.plugin.destroy && typeof this.plugin.destroy === 'function') {
+      this.plugin.destroy.call(this);
+    }
+    delete this.effect;
+
+    if (this.frameBuffer) {
+      this.frameBuffer.destroy();
+      delete this.frameBuffer;
+      delete this.texture;
+    }
+
+    // stop watching any input elements
+    for (const i in this.inputElements) {
+      if (this.inputElements.hasOwnProperty(i)) {
+        const item = this.inputElements[i];
+        item.element.removeEventListener('change', item.listener, true);
+        item.element.removeEventListener('input', item.listener, true);
       }
-    } else {
-      //copy source.cumulativeMatrix
-      mat4.copy(this.cumulativeMatrix, this.source.cumulativeMatrix || identity);
     }
 
-    this.transformDirty = false;
-  }
+    // sources
+    if (this.source) {
+      this.source.removeTarget(this);
+    }
 
-  if (renderTransform && gl) {
-    if (this.renderDirty) {
-      if (!this.frameBuffer) {
-        this.uniforms = {
-          resolution: [this.width, this.height]
-        };
-        this.frameBuffer = new FrameBuffer(gl, this.width, this.height);
+    // targets
+    while (this.targets.length) {
+      const item = this.targets.pop();
+      if (item && item.removeSource) {
+        item.removeSource(this);
+      }
+    }
+
+    for (const key in this) {
+      if (this.hasOwnProperty(key) && key !== 'id') {
+        delete this[key];
+      }
+    }
+
+    // remove any aliases
+    for (const key in this.seriously.aliases) {
+      if (this.seriously.aliases.hasOwnProperty(key)) {
+        continue;
       }
 
-      this.uniforms.source = this.source.texture;
-      this.uniforms.transform = this.cumulativeMatrix || identity;
-      draw(baseShader, rectangleModel, this.uniforms, this.frameBuffer.frameBuffer, this);
-
-      this.renderDirty = false;
-    }
-    this.texture = this.frameBuffer.texture;
-  } else if (this.source) {
-    this.texture = this.source.texture;
-  } else {
-    this.texture = null;
-  }
-
-  this.dirty = false;
-
-  return this.texture;
-};
-
-TransformNode.prototype.readPixels = function (x, y, width, height, dest) {
-  var nodeGl = this.gl || gl;
-
-  if (!gl) {
-    //todo: is this the best approach?
-    throw new Error('Cannot read pixels until a canvas is connected');
-  }
-
-  //todo: check on x, y, width, height
-  this.render(true);
-
-  if (dest === undefined) {
-    dest = new Uint8Array(width * height * 4);
-  } else if (!(util.isInstance(dest, 'Uint8Array'))) {
-    throw new Error('Incompatible array type');
-  }
-
-  nodeGl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer.frameBuffer);
-  nodeGl.readPixels(x, y, width, height, gl.RGBA, gl.UNSIGNED_BYTE, dest);
-
-  return dest;
-};
-
-TransformNode.prototype.destroy = function () {
-  var i, key, item, hook = this.hook;
-
-  //let effect destroy itself
-  if (this.plugin.destroy && typeof this.plugin.destroy === 'function') {
-    this.plugin.destroy.call(this);
-  }
-  delete this.effect;
-
-  if (this.frameBuffer) {
-    this.frameBuffer.destroy();
-    delete this.frameBuffer;
-    delete this.texture;
-  }
-
-  //stop watching any input elements
-  for (i in this.inputElements) {
-    if (this.inputElements.hasOwnProperty(i)) {
-      item = this.inputElements[i];
-      item.element.removeEventListener('change', item.listener, true);
-      item.element.removeEventListener('input', item.listener, true);
-    }
-  }
-
-  //sources
-  if (this.source) {
-    this.source.removeTarget(this);
-  }
-
-  //targets
-  while (this.targets.length) {
-    item = this.targets.pop();
-    if (item && item.removeSource) {
-      item.removeSource(this);
-    }
-  }
-
-  for (key in this) {
-    if (this.hasOwnProperty(key) && key !== 'id') {
-      delete this[key];
-    }
-  }
-
-  //remove any aliases
-  for (key in aliases) {
-    if (aliases.hasOwnProperty(key)) {
-      item = aliases[key];
+      const item = this.seriously.aliases[key];
       if (item.node === this) {
-        seriously.removeAlias(key);
+        this.seriously.removeAlias(key);
       }
     }
+
+    // remove self from master list of effects
+    let i = this.seriously.transforms.indexOf(this);
+    if (i >= 0) {
+      this.seriously.transforms.splice(i, 1);
+    }
+
+    i = this.seriously.Seriously.registry.allTransformsByHook[hook].indexOf(this);
+    if (i >= 0) {
+      this.seriously.Seriously.registry.allTransformsByHook[hook].splice(i, 1);
+    }
+
+    super.destroy();
   }
-
-  //remove self from master list of effects
-  i = transforms.indexOf(this);
-  if (i >= 0) {
-    transforms.splice(i, 1);
-  }
-
-  i = allTransformsByHook[hook].indexOf(this);
-  if (i >= 0) {
-    allTransformsByHook[hook].splice(i, 1);
-  }
-
-  Node.prototype.destroy.call(this);
-};
-
-TransformNode.prototype.setReady = Node.prototype.setReady;
-TransformNode.prototype.setUnready = Node.prototype.setUnready;
-TransformNode.prototype.on = Node.prototype.on;
-TransformNode.prototype.off = Node.prototype.off;
-TransformNode.prototype.emit = Node.prototype.emit;
+}
