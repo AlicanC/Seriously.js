@@ -355,6 +355,10 @@ export function getTestContext(incompatibility) {
   return testContext;
 }
 
+/*
+faster than setTimeout(fn, 0);
+http://dbaron.org/log/20100309-faster-timeouts
+*/
 const timeouts = [];
 export function setTimeoutZero(fn) {
   /*

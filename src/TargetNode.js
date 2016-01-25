@@ -1,3 +1,5 @@
+import { mat4 } from 'gl-matrix';
+
 import PluggableNode from './PluggableNode.js';
 import Target from './Target.js';
 import FrameBuffer from './FrameBuffer.js';
@@ -11,7 +13,6 @@ import {
   baseVertexShader,
   baseFragmentShader,
 } from './utilities.js';
-const mat4 = require('./mat4.js');
 
 export default class TargetNode extends PluggableNode {
   constructor(seriously, hook, target, options) {

@@ -1,11 +1,11 @@
+import { mat4 } from 'gl-matrix';
+
 import FrameBuffer from './FrameBuffer.js';
 import ShaderProgram from './ShaderProgram.js';
-
 import SourceNode from './SourceNode.js';
 import EffectNode from './EffectNode.js';
 import TransformNode from './TransformNode.js';
 import TargetNode from './TargetNode.js';
-
 import Effect from './Effect.js';
 import Source from './Source.js';
 import Transform from './Transform.js';
@@ -48,7 +48,7 @@ export default class Seriously {
   };
 
   static util = {
-    mat4: require('./mat4.js'),
+    mat4,
     checkSource,
     hslToRgb,
     colors: colorNames,
@@ -108,7 +108,7 @@ export default class Seriously {
     return false;
   }
 
-  static plugin(hook, definition, meta) {
+  static effect(hook, definition, meta) {
     // var effect;
 
     if (Seriously.registry.effects[hook]) {
@@ -1227,18 +1227,18 @@ const effects = ['polar', 'temperature', 'ripple',
 
 const blur = require('./pluggables/effects/blur/blur.js');
 if (blur.definition) {
-  Seriously.plugin(blur.hook, blur.definition, blur.meta);
+  Seriously.effect(blur.hook, blur.definition, blur.meta);
 } else {
-  Seriously.plugin(blur.hook, blur.meta);
+  Seriously.effect(blur.hook, blur.meta);
 }
 
 
 for (const effectName of effects) {
   const effect = require(`./pluggables/effects/${effectName}.js`);
   if (effect.definition) {
-    Seriously.plugin(effect.hook, effect.definition, effect.meta);
+    Seriously.effect(effect.hook, effect.definition, effect.meta);
   } else {
-    Seriously.plugin(effect.hook, effect.meta);
+    Seriously.effect(effect.hook, effect.meta);
   }
 }
 

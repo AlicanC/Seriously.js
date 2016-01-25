@@ -1,8 +1,9 @@
+import { mat4 } from 'gl-matrix';
+
 import PluggableNode from './PluggableNode.js';
 import Transform from './Transform.js';
 import FrameBuffer from './FrameBuffer.js';
 import { isInstance, validateInputSpecs, reservedNames, identity } from './utilities.js';
-const mat4 = require('./mat4.js');
 
 export default class TransformNode extends PluggableNode {
   constructor(seriously, hook, options) {

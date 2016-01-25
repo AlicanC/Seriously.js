@@ -7,7 +7,7 @@ Affine transforms
 - skew
 */
 import Transform from '../aaTransform.js';
-const mat4 = require('../../mat4.js');
+import { mat4 } from 'gl-matrix';
 
 module.exports = new Transform('reformat', function () {
 	    var me = this,
